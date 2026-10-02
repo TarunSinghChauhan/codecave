@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ask Sensei — MY CODECAVE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--text:#07080a;--muted:#1f2226;--display:'Big Shoulders Display','Arial Narrow',Impact,sans-serif;--mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#8c8f93}
+body{min-height:100vh;color:var(--text);font-family:var(--mono);font-size:.92rem;line-height:1.65;
+  background:radial-gradient(ellipse 85% 65% at 50% 10%,#9b9ea2 0%,#8c8f93 55%,#7b7e83 100%) fixed}
+.glow{position:fixed;top:0;left:50%;width:min(1000px,120vw);height:60%;transform:translateX(-50%);pointer-events:none;
+  background:radial-gradient(ellipse at 50% 30%,rgba(255,255,255,.24),transparent 68%);filter:blur(20px);opacity:0;animation:lamp 2.2s linear .1s forwards}
+@keyframes lamp{0%{opacity:0}6%{opacity:.9}10%{opacity:.05}18%{opacity:.75}24%{opacity:.15}38%{opacity:.9}100%{opacity:.85}}
+.vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 50%,rgba(0,0,0,.3) 100%)}
+.noise{position:fixed;inset:0;pointer-events:none;z-index:5;opacity:.5;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+#float{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.f{position:absolute}
+.i{display:block;white-space:nowrap;color:var(--c);opacity:var(--o);animation:drift var(--t) ease-in-out var(--dl) infinite}
+@keyframes drift{0%,100%{transform:translate(0,0)}50%{transform:translate(var(--dx),var(--dy))}}
+.tr{position:fixed;left:0;top:0;pointer-events:none;z-index:6;font-weight:500;color:var(--c);font-size:var(--s);opacity:0;animation:trail 1.1s ease-out forwards}
+@keyframes trail{0%{opacity:.95;transform:translate(var(--x),var(--y)) scale(1)}100%{opacity:0;transform:translate(calc(var(--x) + var(--dx)),calc(var(--y) + var(--dy))) scale(.7)}}
+
+.wrap{position:relative;z-index:2;max-width:900px;margin:0 auto;padding:max(22px,env(safe-area-inset-top)) 20px 70px}
+header{margin-bottom:26px;opacity:0;animation:fade .9s ease 1s forwards}
+.brand{display:inline-block;font-family:var(--display);font-weight:900;font-size:clamp(3rem,10vw,5.4rem);line-height:.9;letter-spacing:.035em;text-transform:uppercase;text-decoration:none;
+  background:linear-gradient(180deg,#000 0%,#14161a 55%,#2e3237 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+header p{margin-top:10px;color:var(--muted);max-width:56ch}
+header a.back{display:inline-block;margin-top:10px;color:var(--text);font-weight:500}
+@keyframes fade{to{opacity:1}}
+.main{display:flex;flex-direction:column;gap:20px;opacity:0;animation:fade .9s ease 1.3s forwards}
+.p{border:1px solid rgba(0,0,0,.55);background:rgba(255,255,255,.14);padding:18px}
+.p h2{font-size:1rem;font-weight:500;margin-bottom:4px}
+.lvl{font-size:.82rem;color:var(--muted)}
+textarea{width:100%;min-height:210px;margin-top:10px;resize:vertical;background:#0c0d0f;color:#e6e8eb;border:1px solid #000;padding:14px;font:500 .9rem/1.6 var(--mono);tab-size:4;outline:none}
+textarea:focus-visible{outline:2px solid #000;outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.btn{font:inherit;font-weight:500;cursor:pointer;color:var(--text);background:rgba(0,0,0,.04);border:1px solid #07080a;padding:11px 24px;transition:background .25s,color .25s}
+.btn:hover{background:#07080a;color:#e9eaec}
+.btn:focus-visible{outline:2px solid #000;outline-offset:3px}
+.say{border-left:3px solid #000;padding-left:12px;margin-top:12px;max-width:68ch}
+.rw{margin-top:12px;opacity:0;transform:translateY(6px);animation:up .5s ease forwards}
+@keyframes up{to{opacity:1;transform:none}}
+.rw pre{background:#0c0d0f;color:#e6e8eb;padding:8px 12px;overflow-x:auto;font:500 .85rem/1.5 var(--mono)}
+.rw div{padding:6px 12px 0;border-left:3px solid #000;margin-top:-1px}
+code{background:rgba(0,0,0,.14);padding:0 5px;font-family:var(--mono);font-size:.88em}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{border:1px solid #07080a;padding:2px 10px;font-size:.82rem}
+.note{margin-top:14px;font-size:.8rem;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-delay:0s!important}header,.main{opacity:1}.glow{opacity:.85}.rw{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="glow"></div><div class="vig"></div><div id="float" aria-hidden="true"></div><div class="noise"></div>
+<div class="wrap">
+  <header>
+    <span class="brand">Ask Sensei</span>
+    <p>Paste any code. Sensei walks through it line by line, in plain English.</p>
+    <a class="back" href="index.html">&larr; MY CODECAVE</a>
+  </header>
+  <div class="main">
+    <section class="p">
+      <h2>Paste your code here</h2>
+      <div class="lvl">The box below starts with a sample. Click it and paste over the sample, or press "Paste my code".</div>
+      <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Code to explain" placeholder="Paste your Python or JavaScript here"></textarea>
+      <div class="row"><button class="btn" id="paste">Paste my code</button><button class="btn" id="go">Explain it</button><button class="btn" id="sample">Load sample</button><button class="btn" id="clear">Clear</button></div>
+    </section>
+    <section class="p" aria-live="polite">
+      <h2>Sensei</h2>
+      <div id="out"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+/*ENGINE*/
+var SAMPLE='def two_sum(nums, target):\n    seen = {}\n    for i, n in enumerate(nums):\n        need = target - n\n        if need in seen:\n            return [seen[need], i]\n        seen[n] = i\n';
+var SAMPLE_NOTES=[
+ 'Starts a function called <code>two_sum</code>. It receives a list of numbers and a target total. The goal: find two numbers in the list that add up to the target.',
+ 'Makes an empty dictionary called <code>seen</code>. It will remember each number we have already looked at, and the position where we saw it.',
+ 'Walks through the list one number at a time. <code>enumerate</code> hands us two things on every round: the position <code>i</code> and the number <code>n</code>.',
+ 'Works out the partner we would need. If the current number is <code>n</code>, then <code>target - n</code> is what must be added to reach the target.',
+ 'Asks: have we already seen that partner earlier in the list? Checking a dictionary is instant, so there is no need for a second loop.',
+ 'Yes! Hands back the earlier position and the current one, and the function ends. That pair of positions is the answer.',
+ 'Not yet. Remember this number and its position for later rounds, then go on to the next number.'
+];
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function k(s){return '<code>'+esc(String(s).trim())+'</code>'}
+function lang(c){
+  if(/^\s*(def |elif |from \w+ import|import \w+\s*$|print\()/m.test(c)||(/:\s*$/m.test(c)&&!/[{};]/.test(c)))return 'py';
+  if(/[{};]|=>|\b(const|let|var|function)\b/.test(c))return 'js';
+  return 'py';
+}
+function val(v){
+  v=v.trim().replace(/;$/,'');
+  if(v==='{}'||/^dict\(\)$/.test(v)||/^new Map\(\)$/.test(v))return ', an empty lookup table that maps keys to values';
+  if(v==='[]'||/^list\(\)$/.test(v))return ', an empty list';
+  if(/^(set\(\)|new Set\(\))$/.test(v))return ', an empty set of unique items';
+  if(/^(input|prompt)\(/.test(v))return ', which asks the user to type something';
+  return '';
+}
+function args(a){a=a.trim();return a?'It takes: '+k(a)+'.':'It takes no inputs.'}
+var PY=[
+ [/^#\s*(.*)/,function(m){return 'A comment. It is a note for humans and the computer ignores it.'}],
+ [/^def\s+(\w+)\s*\((.*)\)\s*(->.*)?:$/,function(m){return 'Defines a function named '+k(m[1])+'. '+args(m[2])+' Nothing inside runs until the function is called.'}],
+ [/^class\s+(\w+)/,function(m){return 'Defines a class named '+k(m[1])+', a blueprint for making objects.'}],
+ [/^for\s+(.+?)\s+in\s+(.+):$/,function(m){return 'A loop. The indented lines below repeat once for each item in '+k(m[2])+', calling the current item '+k(m[1])+'.'}],
+ [/^while\s+(.+):$/,function(m){return 'A loop. The indented lines below keep repeating as long as '+k(m[1])+' is true.'}],
+ [/^if\s+(.+):$/,function(m){return 'A decision. The indented lines below only run when '+k(m[1])+' is true.'}],
+ [/^elif\s+(.+):$/,function(m){return 'Otherwise, if '+k(m[1])+' is true, run the indented lines below instead.'}],
+ [/^else\s*:$/,function(){return 'If none of the conditions above were true, run the indented lines below.'}],
+ [/^try\s*:$/,function(){return 'Try the indented lines below. If an error happens, jump to the matching <code>except</code>.'}],
+ [/^except\b(.*):$/,function(){return 'Runs only if something went wrong inside the <code>try</code> block.'}],
+ [/^return\b\s*(.*)$/,function(m){return m[1]?'Ends the function and hands '+k(m[1])+' back to whoever called it.':'Ends the function here.'}],
+ [/^(from\s+\S+\s+)?import\s+(.+)$/,function(m){return 'Brings in '+k(m[2])+' so this file can use it.'}],
+ [/^print\((.*)\)$/,function(m){return 'Shows '+k(m[1])+' on the screen.'}],
+ [/^([\w.\[\]]+)\s*(\+=|-=|\*=|\/=)\s*(.+)$/,function(m){return 'Updates '+k(m[1])+' in place using '+k(m[2]+' '+m[3])+'.'}],
+ [/^([A-Za-z_][\w.\[\], ]*?)\s*=\s*(?!=)(.+)$/,function(m){return 'Stores '+k(m[2])+' in '+k(m[1])+val(m[2])+'.'}]
+];
+var JS=[
+ [/^(\/\/|\/\*|\*)/,function(){return 'A comment. It is a note for humans and the computer ignores it.'}],
+ [/^(async\s+)?function\s*(\w*)\s*\((.*)\)\s*\{?$/,function(m){return 'Defines a function named '+k(m[2]||'(anonymous)')+'. '+args(m[3])+' Nothing inside runs until it is called.'}],
+ [/^(const|let|var)\s+(\w+)\s*=\s*(async\s*)?\(?([^)=]*)\)?\s*=>/,function(m){return 'Defines an arrow function named '+k(m[2])+'. '+args(m[4])}],
+ [/^class\s+(\w+)/,function(m){return 'Defines a class named '+k(m[1])+', a blueprint for making objects.'}],
+ [/^for\s*\(\s*(?:const|let|var)\s+(\w+)\s+(?:of|in)\s+(.+)\)\s*\{?$/,function(m){return 'A loop. The block below repeats once for each item in '+k(m[2])+', calling the current item '+k(m[1])+'.'}],
+ [/^for\s*\((.*)\)\s*\{?$/,function(m){return 'A loop. The parentheses hold three parts: where to start, when to keep going, and what to change after each round: '+k(m[1])+'.'}],
+ [/^while\s*\((.*)\)\s*\{?$/,function(m){return 'A loop. The block below keeps repeating as long as '+k(m[1])+' is true.'}],
+ [/^(\}\s*)?else\s+if\s*\((.*)\)\s*\{?$/,function(m){return 'Otherwise, if '+k(m[2])+' is true, run the block below instead.'}],
+ [/^(\}\s*)?else\s*\{?$/,function(){return 'If none of the conditions above were true, run the block below.'}],
+ [/^if\s*\((.*)\)\s*\{?(.*)$/,function(m){return 'A decision. The block below only runs when '+k(m[1])+' is true.'}],
+ [/^try\s*\{?$/,function(){return 'Try the block below. If an error happens, jump to <code>catch</code>.'}],
+ [/^(\}\s*)?catch\b/,function(){return 'Runs only if something went wrong inside the <code>try</code> block.'}],
+ [/^return\b\s*(.*?);?$/,function(m){return m[1]?'Ends the function and hands '+k(m[1])+' back to whoever called it.':'Ends the function here.'}],
+ [/^import\b(.+)$/,function(m){return 'Brings in code from elsewhere: '+k(m[1].replace(/;$/,''))+'.'}],
+ [/^console\.log\((.*)\);?$/,function(m){return 'Shows '+k(m[1])+' in the console.'}],
+ [/^(const|let|var)\s+([\w{}\[\], ]+?)\s*=\s*(.+?);?$/,function(m){return 'Creates '+(m[1]==='const'?'a constant':'a variable')+' '+k(m[2])+' and stores '+k(m[3])+' in it'+val(m[3])+'.'}],
+ [/^([\w.\[\]]+)\s*(\+=|-=|\*=|\/=)\s*(.+?);?$/,function(m){return 'Updates '+k(m[1])+' in place using '+k(m[2]+' '+m[3])+'.'}],
+ [/^([\w.\[\]]+)\s*=\s*(?!=)(.+?);?$/,function(m){return 'Stores '+k(m[2])+' in '+k(m[1])+val(m[2])+'.'}],
+ [/^[}\])]+[;,]?$/,function(){return 'Closes a block or group that was opened above.'}]
+];
+function note(line,L){
+  var t=line.trim(),R=L==='py'?PY:JS;
+  for(var i=0;i<R.length;i++){var m=t.match(R[i][0]);if(m)return R[i][1](m,t)}
+  return 'Runs '+k(t)+'.';
+}
+function selfCalls(c){
+  var ls=c.split('\n');
+  for(var i=0;i<ls.length;i++){
+    var m=ls[i].match(/^(\s*)(?:async\s+)?(?:def|function)\s+(\w+)/);
+    if(!m)continue;
+    var re=new RegExp('\\b'+m[2]+'\\s*\\('),py=/^\s*def\s/.test(ls[i]),ind=m[1].length,depth=0,body='';
+    if(!py)depth=(ls[i].match(/\{/g)||[]).length-(ls[i].match(/\}/g)||[]).length;
+    for(var j=i+1;j<ls.length;j++){
+      var l=ls[j];
+      if(py){if(l.trim()&&l.match(/^\s*/)[0].length<=ind)break}
+      else{depth+=(l.match(/\{/g)||[]).length-(l.match(/\}/g)||[]).length;if(depth<=0)break}
+      body+=l+'\n';
+    }
+    if(re.test(body))return true;
+  }
+  return false;
+}
+function summary(c,L){
+  var n=c.split('\n').filter(function(x){return x.trim()}).length;
+  var fn=(c.match(/^\s*(def |(async\s+)?function[\s(]|class )|=>/gm)||[]).length;
+  var lp=(c.match(/^\s*(\}\s*)?(for|while)\b/gm)||[]).length;
+  var cd=(c.match(/^\s*(\}\s*)?(if|elif|else if)\b/gm)||[]).length;
+  var rec=selfCalls(c);
+  var chips=[];
+  if(fn)chips.push('functions');if(lp)chips.push('loops');if(cd)chips.push('conditions');
+  if(/\{\}|dict\(|new Map|\{\s*["'\w]+\s*:/.test(c))chips.push('lookup table');
+  if(/(=|\bin|\breturn|\()\s*\[/.test(c)||/list\(/.test(c))chips.push('lists');
+  if(rec)chips.push('recursion');
+  return {text:'Big picture: '+n+' lines of '+(L==='py'?'Python':'JavaScript')+'. It has '+fn+' function'+(fn===1?'':'s')+', '+lp+' loop'+(lp===1?'':'s')+' and '+cd+' decision'+(cd===1?'':'s')+'. Read it top to bottom, and remember that every indented or bracketed block belongs to the line just above it.'+(rec?' The function calls itself, which is called recursion.':''),chips:chips};
+}
+/*END*/
+
+(function(){
+  var $=function(i){return document.getElementById(i)},code=$('code'),out=$('out');
+  var norm=function(s){return s.replace(/\s+$/gm,'').trim()};
+  function explain(){
+    var c=code.value;out.innerHTML='';
+    if(!c.trim()){out.innerHTML='<p class="say">Paste some code first, then press Explain it.</p>';return}
+    var isSample=norm(c)===norm(SAMPLE),L=lang(c),lines=c.split('\n').filter(function(x){return x.trim()});
+    var intro=document.createElement('p');intro.className='say';
+    intro.textContent=isSample?'Let us read this one together. It finds two numbers that add up to a target, and it does it in a single pass.':'Let us walk through it line by line.';
+    out.appendChild(intro);
+    lines.forEach(function(ln,i){
+      var d=document.createElement('div');d.className='rw';d.style.animationDelay=(.25+i*.22)+'s';
+      var pre=document.createElement('pre');pre.textContent=ln.replace(/\t/g,'    ');
+      var nt=document.createElement('div');nt.innerHTML=isSample?SAMPLE_NOTES[i]:note(ln,L);
+      d.appendChild(pre);d.appendChild(nt);out.appendChild(d);
+    });
+    var s=summary(c,L),t=(.25+lines.length*.22)+'s';
+    var big=document.createElement('p');big.className='say rw';big.style.animationDelay=t;
+    big.textContent=isSample?'Big picture: the dictionary lets us remember the past, so one loop is enough. Checking every pair would need two loops and be much slower.':s.text;
+    out.appendChild(big);
+    var ch=document.createElement('div');ch.className='chips rw';ch.style.animationDelay=t;
+    (isSample?['functions','loops','conditions','lookup table']:s.chips).forEach(function(x){var e=document.createElement('span');e.className='chip';e.textContent=x;ch.appendChild(e)});
+    if(ch.children.length)out.appendChild(ch);
+    if(!isSample){var n=document.createElement('p');n.className='note rw';n.style.animationDelay=t;
+      n.textContent='This free explainer recognises common Python and JavaScript patterns. Unusual code gets a simple "runs this" note.';out.appendChild(n)}
+  }
+  $('go').onclick=explain;
+  $('paste').onclick=function(){
+    var fallback=function(){code.focus();code.select()};
+    if(!navigator.clipboard||!navigator.clipboard.readText)return fallback();
+    navigator.clipboard.readText().then(function(t){if(t.trim()){code.value=t;explain()}else fallback()},fallback);
+  };
+  code.addEventListener('focus',function(){if(norm(code.value)===norm(SAMPLE))code.select()});
+  $('sample').onclick=function(){code.value=SAMPLE;explain()};
+  $('clear').onclick=function(){code.value='';out.innerHTML='';code.focus()};
+
+  /* same floating code and cursor trail as the home page */
+  var sn=['const','function()','async/await','{ }','< />','=>','01','git commit','npm run dev','API','LLM','Python','FastAPI','Redis','GitHub','def solve():','import','return','await','git push','for i in range(n)','!=','&&','SELECT *'];
+  var greys=['#000','#07080a','#101215','#1b1e22'];
+  function r(a,b){return a+Math.random()*(b-a)}
+  function pk(a){return a[Math.floor(Math.random()*a.length)]}
+  var fl=$('float');
+  function build(){
+    fl.innerHTML='';var w=innerWidth,h=innerHeight,m=w<700,cols=m?3:7,rows=m?6:4,cw=w/cols,ch=h/rows;
+    for(var i=0;i<cols;i++)for(var j=0;j<rows;j++){
+      if(Math.random()<.3)continue;
+      var f=document.createElement('div'),e=document.createElement('div');f.className='f';e.className='i';
+      e.textContent=pk(sn);e.style.fontSize=r(12,m?15:19).toFixed(0)+'px';
+      e.style.setProperty('--c',pk(greys));e.style.setProperty('--o',r(.28,.5).toFixed(2));
+      e.style.setProperty('--dx',r(-9,9).toFixed(0)+'px');e.style.setProperty('--dy',r(-11,11).toFixed(0)+'px');
+      e.style.setProperty('--t',r(16,32).toFixed(1)+'s');e.style.setProperty('--dl',(-r(0,20)).toFixed(1)+'s');
+      f.appendChild(e);fl.appendChild(f);
+      f.style.left=(i*cw+r(6,Math.max(8,cw-f.offsetWidth-10))).toFixed(0)+'px';
+      f.style.top=(j*ch+r(6,Math.max(8,ch-f.offsetHeight-10))).toFixed(0)+'px';
+    }
+  }
+  var tm;addEventListener('resize',function(){clearTimeout(tm);tm=setTimeout(build,200)});
+  build();
+  code.value=SAMPLE;setTimeout(explain,1400);
+
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  var cc=['{','}','<','>','/',';','0','1','()','=>','[]','#','$','&&','::','fn','if'],lx=-999,ly=-999,live=0;
+  addEventListener('pointermove',function(e){
+    if(e.pointerType!=='mouse'||live>28||Math.hypot(e.clientX-lx,e.clientY-ly)<34)return;
+    lx=e.clientX;ly=e.clientY;live++;
+    var t=document.createElement('span');t.className='tr';t.textContent=pk(cc);
+    t.style.setProperty('--c',pk(greys));t.style.setProperty('--s',r(12,19).toFixed(0)+'px');
+    t.style.setProperty('--x',(lx+r(-8,8)).toFixed(0)+'px');t.style.setProperty('--y',(ly+r(-8,8)).toFixed(0)+'px');
+    t.style.setProperty('--dx',r(-26,26).toFixed(0)+'px');t.style.setProperty('--dy',r(14,46).toFixed(0)+'px');
+    t.addEventListener('animationend',function(){t.remove();live--});
+    document.body.appendChild(t);
+  });
+})();
+</script>
+</body>
+</html>
