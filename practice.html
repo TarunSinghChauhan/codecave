@@ -221,7 +221,7 @@ function speakText(t){
     (isSample?['functions','loops','conditions','lookup table']:s.chips).forEach(function(x){var e=document.createElement('span');e.className='chip';e.textContent=x;ch.appendChild(e)});
     if(ch.children.length)out.appendChild(ch);
     if(!isSample){var n=document.createElement('p');n.className='note rw';n.style.animationDelay=t;
-      n.textContent=failed?'The AI explainer is not available right now (not set up, offline, or limit reached), so this is the basic offline explanation.':'This free explainer recognises common Python and JavaScript patterns. Unusual code gets a simple "runs this" note.';out.appendChild(n)}
+      n.textContent=failed?'The AI explainer did not work ('+(typeof failed==='string'?failed:'unknown reason')+'), so this is the basic offline explanation.':'This free explainer recognises common Python and JavaScript patterns. Unusual code gets a simple "runs this" note.';out.appendChild(n)}
   }
   /* narration: free browser text-to-speech, starts only when the user clicks Listen */
   var synth=window.speechSynthesis,speaking=false,voice=null,seq=0,lb=$('listen');
@@ -279,9 +279,9 @@ function speakText(t){
     var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},30000);
     fetch('/api/explain',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,
       body:JSON.stringify({code:c,level:$('lvl').value,question:q})})
-      .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'failed');return j})})
+      .then(function(r){return r.json().catch(function(){return {error:'the /api/explain function was not found (HTTP '+r.status+')'}}).then(function(j){if(!r.ok)throw new Error(j.error||'failed (HTTP '+r.status+')');return j})})
       .then(renderAI)
-      .catch(function(){explain(true)})
+      .catch(function(err){explain(String((err&&err.message)||'unknown error').slice(0,220))})
       .then(function(){clearTimeout(to);$('go').disabled=false});
   }
   $('go').onclick=ask;
