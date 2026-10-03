@@ -4,7 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MY CODECAVE — Crack the code.</title>
-<meta name="description" content="CodeCave: practice coding with a Sensei that gives hints, not answers.">
+<meta name="description" content="Paste your code. Sensei explains it in simple words.">
+<meta name="theme-color" content="#8c8f93">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%238c8f93'/%3E%3Ctext x='32' y='42' font-family='monospace' font-size='28' font-weight='700' text-anchor='middle' fill='%2307080a'%3E%26lt;/%26gt;%3C/text%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MY CODECAVE">
+<meta property="og:title" content="MY CODECAVE — Crack the code.">
+<meta property="og:description" content="Paste your code. Sensei explains it in simple words.">
+<meta property="og:url" content="https://trustcodecave.vercel.app/">
+<meta property="og:image" content="https://trustcodecave.vercel.app/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="MY CODECAVE. Crack the code.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MY CODECAVE — Crack the code.">
+<meta name="twitter:description" content="Paste your code. Sensei explains it in simple words.">
+<meta name="twitter:image" content="https://trustcodecave.vercel.app/og-image.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -223,16 +238,16 @@ h1{font-family:var(--display);font-weight:900;text-transform:uppercase;line-heig
   }
 
   /* draw the word on a hidden canvas and read back dot positions */
-  function sample(word,box){
+  function sample(word,box,availW){
     var c=document.createElement('canvas'),x=c.getContext('2d'),small=innerWidth<700;
     x.font='900 100px '+FONT;
     var ws=word.split('').map(function(ch){return x.measureText(ch).width});
     var cap=x.measureText('H').actualBoundingBoxAscent||72;
     var sum=ws.reduce(function(a,b){return a+b},0),n=word.length;
-    var T0=cap*.1,nat=sum+(n-1)*T0,s=box.h*.78/cap,W=nat*s,maxW=Math.min(box.w*1.7,innerWidth-24),T=T0;
+    var T0=cap*.1,nat=sum+(n-1)*T0,s=box.h*.78/cap,W=nat*s,maxW=availW-4,T=T0;
     if(W>maxW){s=maxW/nat;W=maxW}
     else{
-      var want=Math.min(box.w*.9,W*2.2);
+      var want=Math.min(box.w*.9,W*2.2,availW-4);
       if(want>W&&n>1){T=Math.min(T0+(want-W)/s/(n-1),cap*.5);W=(sum+(n-1)*T)*s}
     }
     var h=cap*s,cw=Math.ceil(W)+4,ch=Math.ceil(h)+4;
@@ -251,8 +266,15 @@ h1{font-family:var(--display);font-weight:900;text-transform:uppercase;line-heig
     var g=G[gi],b=boxes[gi];
     active=gi;
     g.idx.forEach(function(i){clearTimeout(chEls[i]._rt);chEls[i].classList.add('broken')});
-    var S=g.cache||(g.cache=sample(g.word,b));
-    var cx=clamp(b.cx,S.cw/2+12,innerWidth-S.cw/2-12),cy=b.cy,h2=S.g/2;
+    /* free space for the new word: stop 14px short of any neighbouring word on the same line */
+    var aL=12,aR=innerWidth-12;
+    boxes.forEach(function(o,j){
+      if(j===gi||!(b.top<o.bottom&&o.top<b.bottom))return;
+      if(o.right<=b.left+1)aL=Math.max(aL,o.right+14);
+      else if(o.left>=b.right-1)aR=Math.min(aR,o.left-14);
+    });
+    var S=g.cache||(g.cache=sample(g.word,b,aR-aL));
+    var cx=clamp(b.cx,aL+S.cw/2,aR-S.cw/2),cy=b.cy,h2=S.g/2;
     g.pcs=S.pts.map(function(pt){
       var p=document.createElement('span');p.className='pc';
       p.style.width=p.style.height=S.g+'px';
