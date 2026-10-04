@@ -93,12 +93,14 @@ code{background:rgba(0,0,0,.14);padding:0 5px;font-family:var(--mono);font-size:
       <div class="lvl">The box below starts with a sample. Click it and paste over the sample, or press "Paste my code".</div>
       <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Code to explain" placeholder="Paste your Python or JavaScript here"></textarea>
       <div class="opts"><label>Explain it like I am <select id="lvl"><option value="beginner">a complete beginner</option><option value="some">someone who knows the basics</option></select></label>
+        <label>Language <select id="lang"><option value="en">English</option><option value="hi">हिन्दी</option></select></label>
         <input id="q" type="text" maxlength="200" placeholder="Anything confusing? Ask Sensei here (optional)" aria-label="Your question about the code"></div>
       <div class="row"><button class="btn" id="paste">Paste my code</button><button class="btn" id="go">Explain it</button><button class="btn" id="sample">Load sample</button><button class="btn" id="clear">Clear</button></div>
     </section>
     <section class="p" aria-live="polite">
       <h2>Sensei</h2>
       <div class="row" style="margin:6px 0 4px"><button class="btn" id="listen">Listen</button></div>
+      <div class="note" id="vnote"></div>
       <div id="out"></div>
     </section>
   </div>
@@ -116,6 +118,17 @@ var SAMPLE_NOTES=[
  'Yes! Hands back the earlier position and the current one, and the function ends. That pair of positions is the answer.',
  'Not yet. Remember this number and its position for later rounds, then go on to the next number.'
 ];
+var SAMPLE_NOTES_HI=[
+ 'यहाँ से <code>two_sum</code> नाम का function शुरू होता है। इसे संख्याओं की एक list और एक target मिलता है। काम यह है कि list में से दो ऐसी संख्याएँ ढूँढनी हैं जिनका जोड़ target के बराबर हो।',
+ '<code>seen</code> नाम की एक खाली dictionary बनाई। इसमें हम याद रखेंगे कि कौन-सी संख्या हम पहले देख चुके हैं और वह किस position पर थी।',
+ 'अब list की संख्याओं पर एक-एक करके चलते हैं। <code>enumerate</code> हर बार दो चीज़ें देता है: position <code>i</code> और संख्या <code>n</code>।',
+ 'हमें कौन-सी जोड़ीदार संख्या चाहिए, यह निकालते हैं। अगर अभी की संख्या <code>n</code> है, तो target तक पहुँचने के लिए <code>target - n</code> चाहिए।',
+ 'पूछते हैं: क्या वह जोड़ीदार संख्या हम पहले ही देख चुके हैं? dictionary में खोजना तुरंत होता है, इसलिए दूसरे loop की ज़रूरत नहीं पड़ती।',
+ 'हाँ! तो पहले वाली position और अभी वाली position लौटा देते हैं, और function यहीं खत्म हो जाता है। यही जवाब है।',
+ 'अभी नहीं मिली। तो इस संख्या और उसकी position को आगे के लिए याद रख लेते हैं, और अगली संख्या पर चलते हैं।'
+];
+var INTRO_HI='चलिए इस code को साथ में पढ़ते हैं। यह दो ऐसी संख्याएँ ढूँढता है जिनका जोड़ target के बराबर हो, और यह काम सिर्फ़ एक बार list पर चलकर कर लेता है।';
+var BIG_HI='मुख्य बात: dictionary हमें पिछली बातें याद रखने देती है, इसलिए एक ही loop काफ़ी है। हर जोड़ी को जाँचने में दो loop लगते और वह बहुत धीमा होता।';
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function k(s){return '<code>'+esc(String(s).trim())+'</code>'}
 function lang(c){
@@ -205,45 +218,51 @@ function summary(c,L){
   if(rec)chips.push('recursion');
   return {text:'Big picture: '+n+' lines of '+(L==='py'?'Python':'JavaScript')+'. It has '+fn+' function'+(fn===1?'':'s')+', '+lp+' loop'+(lp===1?'':'s')+' and '+cd+' decision'+(cd===1?'':'s')+'. Read it top to bottom, and remember that every indented or bracketed block belongs to the line just above it.'+(rec?' The function calls itself, which is called recursion.':''),chips:chips};
 }
-function speakText(t){
-  return t.replace(/\s+/g,' ').replace(/=>/g,' arrow ').replace(/!=/g,' not equal to ').replace(/==/g,' equals ')
+function speakText(t,lang){
+  t=t.replace(/\s+/g,' ');
+  if(lang==='hi')t=t.replace(/=>/g,' तीर ').replace(/!=/g,' बराबर नहीं ').replace(/==/g,' बराबर ')
+    .replace(/\+=/g,' प्लस इक्वल ').replace(/-=/g,' माइनस इक्वल ').replace(/&&/g,' और ')
+    .replace(/ - /g,' माइनस ').replace(/ \+ /g,' प्लस ').replace(/ \* /g,' गुणा ').replace(/ = /g,' बराबर ');
+  else t=t.replace(/=>/g,' arrow ').replace(/!=/g,' not equal to ').replace(/==/g,' equals ')
     .replace(/\+=/g,' plus equals ').replace(/-=/g,' minus equals ').replace(/&&/g,' and ')
-    .replace(/ - /g,' minus ').replace(/ \+ /g,' plus ').replace(/ \* /g,' times ').replace(/ = /g,' equals ')
-    .replace(/[_`{}\[\]<>]/g,' ').replace(/\s+/g,' ').trim();
+    .replace(/ - /g,' minus ').replace(/ \+ /g,' plus ').replace(/ \* /g,' times ').replace(/ = /g,' equals ');
+  return t.replace(/[_`{}\[\]<>]/g,' ').replace(/\s+/g,' ').trim();
 }
 /*END*/
 
 (function(){
-  var $=function(i){return document.getElementById(i)},code=$('code'),out=$('out');
+  var $=function(i){return document.getElementById(i)},code=$('code'),out=$('out'),outLang='en';
   var norm=function(s){return s.replace(/\s+$/gm,'').trim()};
   function explain(failed){
     stopSpeech();var c=code.value;out.innerHTML='';
     if(!c.trim()){out.innerHTML='<p class="say">Paste some code first, then press Explain it.</p>';return}
-    var isSample=norm(c)===norm(SAMPLE),L=lang(c),lines=c.split('\n').filter(function(x){return x.trim()});
+    var hi=$('lang').value==='hi',isSample=norm(c)===norm(SAMPLE),L=lang(c),lines=c.split('\n').filter(function(x){return x.trim()});
+    outLang=isSample&&hi?'hi':'en';
     var intro=document.createElement('p');intro.className='say';
-    intro.textContent=isSample?'Let us read this one together. It finds two numbers that add up to a target, and it does it in a single pass.':'Let us walk through it line by line.';
+    intro.textContent=isSample&&hi?INTRO_HI:isSample?'Let us read this one together. It finds two numbers that add up to a target, and it does it in a single pass.':'Let us walk through it line by line.';
     out.appendChild(intro);
     lines.forEach(function(ln,i){
       var d=document.createElement('div');d.className='rw';d.style.animationDelay=(.25+i*.22)+'s';
       var pre=document.createElement('pre');pre.textContent=ln.replace(/\t/g,'    ');
-      var nt=document.createElement('div');nt.innerHTML=isSample?SAMPLE_NOTES[i]:note(ln,L);
+      var nt=document.createElement('div');nt.innerHTML=isSample?(hi?SAMPLE_NOTES_HI[i]:SAMPLE_NOTES[i]):note(ln,L);
       d.appendChild(pre);d.appendChild(nt);out.appendChild(d);
     });
     var s=summary(c,L),t=(.25+lines.length*.22)+'s';
     var big=document.createElement('p');big.className='say rw';big.style.animationDelay=t;
-    big.textContent=isSample?'Big picture: the dictionary lets us remember the past, so one loop is enough. Checking every pair would need two loops and be much slower.':s.text;
+    big.textContent=isSample&&hi?BIG_HI:isSample?'Big picture: the dictionary lets us remember the past, so one loop is enough. Checking every pair would need two loops and be much slower.':s.text;
     out.appendChild(big);
     var ch=document.createElement('div');ch.className='chips rw';ch.style.animationDelay=t;
     (isSample?['functions','loops','conditions','lookup table']:s.chips).forEach(function(x){var e=document.createElement('span');e.className='chip';e.textContent=x;ch.appendChild(e)});
     if(ch.children.length)out.appendChild(ch);
     if(!isSample){var n=document.createElement('p');n.className='note rw';n.style.animationDelay=t;
-      n.textContent=failed?'The AI explainer did not work ('+(typeof failed==='string'?failed:'unknown reason')+'), so this is the basic offline explanation.':'This free explainer recognises common Python and JavaScript patterns. Unusual code gets a simple "runs this" note.';out.appendChild(n)}
+      n.textContent=failed?'The AI explainer did not work ('+(typeof failed==='string'?failed:'unknown reason')+'), so this is the basic offline explanation'+(hi?' in English. Hindi needs the AI explainer':'')+'.':'This free explainer recognises common Python and JavaScript patterns. Unusual code gets a simple "runs this" note.';out.appendChild(n)}
   }
   /* narration: free browser text-to-speech, starts only when the user clicks Listen */
-  var synth=window.speechSynthesis,speaking=false,voice=null,seq=0,lb=$('listen');
+  var synth=window.speechSynthesis,speaking=false,voice=null,voiceHi=null,seq=0,lb=$('listen');
   function pickVoice(){
     if(!synth)return;var v=synth.getVoices();
     voice=v.filter(function(x){return /^en-IN/i.test(x.lang)})[0]||v.filter(function(x){return /^en-GB/i.test(x.lang)})[0]||v.filter(function(x){return /^en/i.test(x.lang)})[0]||null;
+    voiceHi=v.filter(function(x){return /^hi/i.test(x.lang)})[0]||null;
   }
   if(synth){pickVoice();if(synth.addEventListener)synth.addEventListener('voiceschanged',pickVoice)}else lb.style.display='none';
   function mark(el){
@@ -255,16 +274,18 @@ function speakText(t){
     if(speaking){stopSpeech();return}
     var items=[],n=0;
     [].forEach.call(out.children,function(el){
-      if(el.querySelector('pre'))items.push({el:el,text:'Step '+(++n)+'. '+speakText(el.lastChild.textContent)});
-      else if(el.classList.contains('say'))items.push({el:el,text:speakText(el.textContent)});
+      if(el.querySelector('pre'))items.push({el:el,text:(outLang==='hi'?'चरण ':'Step ')+(++n)+'. '+speakText(el.lastChild.textContent,outLang)});
+      else if(el.classList.contains('say'))items.push({el:el,text:speakText(el.textContent,outLang)});
     });
     if(!items.length)return;
+    $('vnote').textContent=(outLang==='hi'&&!voiceHi)?'No Hindi voice found on this device, so it may sound wrong. Android phones and Chrome usually have one.':'';
     var my=++seq;speaking=true;lb.textContent='Stop';synth.cancel();
     (function next(i){
       if(my!==seq)return;
       if(i>=items.length){stopSpeech();return}
       var u=new SpeechSynthesisUtterance(items[i].text);
-      if(voice){u.voice=voice;u.lang=voice.lang}else u.lang='en-US';
+      var vv=outLang==='hi'?voiceHi:voice;
+      if(vv){u.voice=vv;u.lang=vv.lang}else u.lang=outLang==='hi'?'hi-IN':'en-US';
       u.rate=.95;u.pitch=.9;
       u.onstart=function(){if(my===seq)mark(items[i].el)};
       u.onend=function(){setTimeout(function(){next(i+1)},250)};
@@ -286,21 +307,22 @@ function speakText(t){
     });
     function tail(txt,cls){var e=document.createElement('p');e.className=cls;e.textContent=txt;e.style.animationDelay=(.2+i++*.22)+'s';out.appendChild(e)}
     if(j.outro)tail(String(j.outro),'say rw');
-    tail('Explained by an AI model, so double-check anything important.','note rw');
+    tail(outLang==='hi'?'यह एक AI मॉडल ने समझाया है, इसलिए ज़रूरी बातें दोबारा जाँच लें।':'Explained by an AI model, so double-check anything important.','note rw');
   }
   function ask(){
-    var c=code.value,q=$('q').value.trim();
+    var c=code.value,q=$('q').value.trim(),lg=$('lang').value;
     if(!c.trim()||(norm(c)===norm(SAMPLE)&&!q)){explain();return}
     stopSpeech();out.innerHTML='<p class="say">Sensei is thinking...</p>';$('go').disabled=true;
     var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},30000);
     fetch('/api/explain',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,
-      body:JSON.stringify({code:c,level:$('lvl').value,question:q})})
+      body:JSON.stringify({code:c,level:$('lvl').value,lang:lg,question:q})})
       .then(function(r){return r.json().catch(function(){return {error:'the /api/explain function was not found (HTTP '+r.status+')'}}).then(function(j){if(!r.ok)throw new Error(j.error||'failed (HTTP '+r.status+')');return j})})
-      .then(renderAI)
+      .then(function(j){outLang=lg;renderAI(j)})
       .catch(function(err){explain(String((err&&err.message)||'unknown error').slice(0,220))})
       .then(function(){clearTimeout(to);$('go').disabled=false});
   }
   $('go').onclick=ask;
+  $('lang').onchange=function(){if(norm(code.value)===norm(SAMPLE))explain()};
   $('paste').onclick=function(){
     var fallback=function(){code.focus();code.select()};
     if(!navigator.clipboard||!navigator.clipboard.readText)return fallback();
