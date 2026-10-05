@@ -81,6 +81,7 @@ module.exports = async function handler(req, res) {
 
   let lastError = 'no model could be reached';
   let busy = false;
+  let lastStatus = 0;
 
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -96,6 +97,7 @@ module.exports = async function handler(req, res) {
           const e = await r.json().catch(function () { return null; });
           const msg = (e && e.error && e.error.message) ? String(e.error.message).slice(0, 140) : '';
           lastError = 'Google said ' + r.status + (msg ? ': ' + msg : '') + ' (model ' + model + ')';
+          lastStatus = r.status;
           if (r.status === 503 || r.status === 429) busy = true;
           if (r.status === 503 && attempt === 0) { await sleep(800); continue; }   // busy: one quick retry on the same model
           if ([404, 429, 500, 502, 503, 504].indexOf(r.status) !== -1) break;       // try the next model
@@ -121,6 +123,6 @@ module.exports = async function handler(req, res) {
     }
   }
   res.status(502).json({
-    error: busy ? "Google's AI is busy or over its free limit right now. Please try again in a minute. [" + lastError + ']' : lastError
+    error: busy ? "Google's AI is busy or over its free limit right now. Please try again in a minute. (HTTP " + lastStatus + ')' : lastError
   });
 };
