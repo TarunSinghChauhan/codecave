@@ -231,6 +231,40 @@ var JSH=[
  function(m){return k(m[2])+' को '+k(m[1])+' में रखता है'+valHi(m[2])+'।'},
  function(){return 'ऊपर खुले हुए block या group को बंद करता है।'}
 ];
+PY.splice(14,0,
+ [/^pass$/,function(){return 'Does nothing. It is only a placeholder so the block is not empty.'}],
+ [/^break$/,function(){return 'Stops the loop right here, even if more rounds were left.'}],
+ [/^continue$/,function(){return 'Skips the rest of this round and jumps to the next one.'}],
+ [/^raise\b\s*(.*)$/,function(m){return m[1]?'Raises an error on purpose: '+k(m[1])+'. The normal flow stops unless something catches it.':'Raises the current error again.'}],
+ [/^with\s+(.+?)\s*:$/,function(m){return 'Opens '+k(m[1])+' for the indented lines below, and closes it properly afterwards, even if an error happens.'}],
+ [/^@(.+)$/,function(m){return 'A decorator. It adds extra behaviour to the function right below it: '+k('@'+m[1])+'.'}],
+ [/^async\s+def\s+(\w+)\s*\((.*)\)\s*(->.*)?:$/,function(m){return 'Defines an async function named '+k(m[1])+'. '+args(m[2])+' It can wait for slow things without freezing the program.'}]
+);
+PYH.splice(14,0,
+ function(){return 'यहाँ कुछ नहीं करता। यह बस एक खाली जगह (placeholder) है ताकि block खाली न रहे।'},
+ function(){return 'loop को यहीं रोक देता है, चाहे अभी और चक्कर बाकी हों।'},
+ function(){return 'इस चक्कर का बाकी हिस्सा छोड़कर सीधे अगले चक्कर पर चला जाता है।'},
+ function(m){return m[1]?'जानबूझकर एक error उठाता है: '+k(m[1])+'। अगर कोई इसे पकड़े नहीं, तो आम तौर पर program यहीं रुक जाता है।':'वही error दोबारा उठाता है।'},
+ function(m){return k(m[1])+' को नीचे की अंदर वाली लाइनों के लिए खोलता है, और बाद में सही तरीके से बंद कर देता है, चाहे error आए।'},
+ function(m){return 'यह एक decorator है। यह ठीक नीचे वाले function में अतिरिक्त काम जोड़ देता है: '+k('@'+m[1])+'।'},
+ function(m){return 'यहाँ '+k(m[1])+' नाम का async function बनता है। '+argsHi(m[2])+' यह धीमी चीज़ों का इंतज़ार कर सकता है, बिना पूरे program को रोके।'}
+);
+JS.splice(15,0,
+ [/^throw\s+(.+?);?$/,function(m){return 'Raises an error on purpose: '+k(m[1])+'.'}],
+ [/^break;?$/,function(){return 'Stops the loop right here, even if more rounds were left.'}],
+ [/^continue;?$/,function(){return 'Skips the rest of this round and jumps to the next one.'}],
+ [/^switch\s*\((.*)\)\s*\{?$/,function(m){return 'Compares '+k(m[1])+' against the cases below and runs the one that matches.'}],
+ [/^(case\s+.+|default)\s*:$/,function(){return 'One possible match. If the value fits, the lines below run.'}],
+ [/^await\s+(.+?);?$/,function(m){return 'Waits for '+k(m[1])+' to finish before moving on.'}]
+);
+JSH.splice(15,0,
+ function(m){return 'जानबूझकर एक error उठाता है: '+k(m[1])+'।'},
+ function(){return 'loop को यहीं रोक देता है, चाहे अभी और चक्कर बाकी हों।'},
+ function(){return 'इस चक्कर का बाकी हिस्सा छोड़कर सीधे अगले चक्कर पर चला जाता है।'},
+ function(m){return k(m[1])+' की तुलना नीचे दिए cases से करता है और जो मेल खाए, उसे चलाता है।'},
+ function(){return 'एक संभावित मेल। अगर value यहाँ फिट बैठे, तो नीचे की लाइनें चलती हैं।'},
+ function(m){return 'आगे बढ़ने से पहले '+k(m[1])+' के पूरा होने का इंतज़ार करता है।'}
+);
 function note(line,L,hi){
   var t=line.trim(),R=L==='py'?PY:JS,H=L==='py'?PYH:JSH;
   for(var i=0;i<R.length;i++){var m=t.match(R[i][0]);if(m)return hi?H[i](m,t):R[i][1](m,t)}
@@ -286,26 +320,39 @@ function speakText(t,lang){
   function explain(failed){
     stopSpeech();var c=code.value;out.innerHTML='';
     if(!c.trim()){out.innerHTML='<p class="say">Paste some code first, then press Explain it.</p>';return}
-    var hi=$('lang').value==='hi',isSample=norm(c)===norm(SAMPLE),L=lang(c),lines=c.split('\n').filter(function(x){return x.trim()});
+    var hi=$('lang').value==='hi',isSample=norm(c)===norm(SAMPLE),L=lang(c);
+    /* quick view: skip comments and lone closing brackets, so only lines that do something are explained */
+    var shown=c.split('\n').filter(function(x){
+      var t=x.trim();return t&&(isSample||(!/^(#|\/\/|\/\*|\*)/.test(t)&&!/^[}\])]+[;,]?$/.test(t)));
+    });
+    var cut=shown.length>25;if(cut)shown=shown.slice(0,25);
+    var step=shown.length>12?.12:.22;
     outLang=hi?'hi':'en';
     var intro=document.createElement('p');intro.className='say';
     intro.textContent=isSample&&hi?INTRO_HI:isSample?'Let us read this one together. It finds two numbers that add up to a target, and it does it in a single pass.':hi?'चलिए इसे एक-एक लाइन करके समझते हैं।':'Let us walk through it line by line.';
     out.appendChild(intro);
-    lines.forEach(function(ln,i){
-      var d=document.createElement('div');d.className='rw';d.style.animationDelay=(.25+i*.22)+'s';
+    shown.forEach(function(ln,i){
+      var d=document.createElement('div');d.className='rw';d.style.animationDelay=(.25+i*step)+'s';
       var pre=document.createElement('pre');pre.textContent=ln.replace(/\t/g,'    ');
       var nt=document.createElement('div');nt.innerHTML=isSample?(hi?SAMPLE_NOTES_HI[i]:SAMPLE_NOTES[i]):note(ln,L,hi);
       d.appendChild(pre);d.appendChild(nt);out.appendChild(d);
     });
-    var s=summary(c,L,hi),t=(.25+lines.length*.22)+'s';
+    var s=summary(c,L,hi),t=(.25+shown.length*step)+'s';
     var big=document.createElement('p');big.className='say rw';big.style.animationDelay=t;
     big.textContent=isSample&&hi?BIG_HI:isSample?'Big picture: the dictionary lets us remember the past, so one loop is enough. Checking every pair would need two loops and be much slower.':s.text;
     out.appendChild(big);
     var ch=document.createElement('div');ch.className='chips rw';ch.style.animationDelay=t;
     (isSample?['functions','loops','conditions','lookup table']:s.chips).forEach(function(x){var e=document.createElement('span');e.className='chip';e.textContent=x;ch.appendChild(e)});
     if(ch.children.length)out.appendChild(ch);
-    if(!isSample){var n=document.createElement('p');n.className='note rw';n.style.animationDelay=t;
-      n.textContent=hi?(failed?'AI समझाने वाला अभी काम नहीं कर पाया ('+(typeof failed==='string'?failed:'अज्ञात कारण')+'), इसलिए यह सरल ऑफ़लाइन व्याख्या है।':'यह मुफ़्त व्याख्या Python और JavaScript के आम पैटर्न पहचानती है। अनोखे code के लिए बस एक सरल नोट मिलता है।'):(failed?'The AI explainer did not work ('+(typeof failed==='string'?failed:'unknown reason')+'), so this is the basic offline explanation.':'This free explainer recognises common Python and JavaScript patterns. Unusual code gets a simple "runs this" note.');out.appendChild(n)}
+    if(!isSample){
+      if(failed&&typeof failed==='string'&&window.console)console.log('AI explainer error:',failed);
+      function addNote(txt){var n=document.createElement('p');n.className='note rw';n.style.animationDelay=t;n.textContent=txt;out.appendChild(n)}
+      if(cut)addNote(hi?'पहली 25 मुख्य लाइनें दिखाई गई हैं।':'Showing the first 25 main lines.');
+      addNote(failed
+        ?(hi?'Sensei का AI अभी थोड़ा व्यस्त है, इसलिए यह सरल व्याख्या दिखाई गई है। एक मिनट बाद फिर कोशिश करें, तो वह ज़्यादा विस्तार से समझाएगा।':"Sensei's AI helper is a little busy right now, so this is the quick explanation. Try again in a minute for a fuller one.")
+        :(hi?'यह सरल व्याख्या Python और JavaScript के आम पैटर्न पहचानती है।':'This quick explanation recognises common Python and JavaScript patterns.'));
+      if(failed){var rb=document.createElement('button');rb.className='btn';rb.style.marginTop='10px';rb.textContent=hi?'AI से फिर कोशिश करें':'Try the AI again';rb.onclick=ask;out.appendChild(rb)}
+    }
   }
   /* narration: free browser text-to-speech, starts only when the user clicks Listen */
   var synth=window.speechSynthesis,speaking=false,voice=null,voiceHi=null,seq=0,lb=$('listen');
