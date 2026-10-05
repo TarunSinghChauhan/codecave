@@ -183,10 +183,58 @@ var JS=[
  [/^([\w.\[\]]+)\s*=\s*(?!=)(.+?);?$/,function(m){return 'Stores '+k(m[2])+' in '+k(m[1])+val(m[2])+'.'}],
  [/^[}\])]+[;,]?$/,function(){return 'Closes a block or group that was opened above.'}]
 ];
-function note(line,L){
-  var t=line.trim(),R=L==='py'?PY:JS;
-  for(var i=0;i<R.length;i++){var m=t.match(R[i][0]);if(m)return R[i][1](m,t)}
-  return 'Runs '+k(t)+'.';
+function argsHi(a){a=a.trim();return a?'यह ये input लेता है: '+k(a)+'।':'यह कोई input नहीं लेता।'}
+function valHi(v){
+  v=v.trim().replace(/;$/,'');
+  if(v==='{}'||/^dict\(\)$/.test(v)||/^new Map\(\)$/.test(v))return ', यानी एक खाली lookup table (key से value ढूँढने वाली)';
+  if(v==='[]'||/^list\(\)$/.test(v))return ', यानी एक खाली list';
+  if(/^(set\(\)|new Set\(\))$/.test(v))return ', यानी अलग-अलग चीज़ों का खाली set';
+  if(/^(input|prompt)\(/.test(v))return ', जो user से कुछ टाइप करवाता है';
+  return '';
+}
+var CMT_HI=function(){return 'यह एक comment है। यह इंसानों के पढ़ने के लिए नोट है, computer इसे अनदेखा कर देता है।'};
+var PYH=[
+ CMT_HI,
+ function(m){return 'यहाँ '+k(m[1])+' नाम का function बनता है। '+argsHi(m[2])+' जब तक इसे call न किया जाए, इसके अंदर का कुछ नहीं चलता।'},
+ function(m){return k(m[1])+' नाम की class बनाई जा रही है, यानी objects बनाने का एक ढाँचा।'},
+ function(m){return 'यह एक loop है। नीचे की अंदर वाली लाइनें '+k(m[2])+' की हर चीज़ के लिए एक-एक बार दोहराई जाती हैं, और मौजूदा चीज़ को '+k(m[1])+' कहा जाता है।'},
+ function(m){return 'यह एक loop है। जब तक '+k(m[1])+' सही है, नीचे की अंदर वाली लाइनें बार-बार चलती रहती हैं।'},
+ function(m){return 'यह एक फ़ैसला (decision) है। नीचे की अंदर वाली लाइनें तभी चलती हैं जब '+k(m[1])+' सही हो।'},
+ function(m){return 'नहीं तो, अगर '+k(m[1])+' सही है, तो इसकी जगह नीचे वाली लाइनें चलती हैं।'},
+ function(){return 'ऊपर की कोई भी शर्त सही नहीं थी, तो नीचे वाली लाइनें चलती हैं।'},
+ function(){return 'नीचे की अंदर वाली लाइनें चलाकर देखता है। अगर कोई error आए, तो सीधे <code>except</code> पर चला जाता है।'},
+ function(){return 'यह तभी चलता है जब <code>try</code> वाले हिस्से में कुछ गड़बड़ हुई हो।'},
+ function(m){return m[1]?'function को यहीं खत्म करता है और '+k(m[1])+' को बुलाने वाले को वापस दे देता है।':'function को यहीं खत्म करता है।'},
+ function(m){return k(m[2])+' को लाता है ताकि यह फ़ाइल उसे इस्तेमाल कर सके।'},
+ function(m){return k(m[1])+' को स्क्रीन पर दिखाता है।'},
+ function(m){return k(m[1])+' को '+k(m[2]+' '+m[3])+' से उसी जगह अपडेट करता है।'},
+ function(m){return k(m[2])+' को '+k(m[1])+' में रखता है'+valHi(m[2])+'।'}
+];
+var JSH=[
+ CMT_HI,
+ function(m){return 'यहाँ '+k(m[2]||'(बिना नाम का)')+' नाम का function बनता है। '+argsHi(m[3])+' जब तक इसे call न किया जाए, इसके अंदर का कुछ नहीं चलता।'},
+ function(m){return k(m[2])+' नाम का arrow function बनाता है। '+argsHi(m[4])},
+ function(m){return k(m[1])+' नाम की class बनाई जा रही है, यानी objects बनाने का एक ढाँचा।'},
+ function(m){return 'यह एक loop है। नीचे का block '+k(m[2])+' की हर चीज़ के लिए एक-एक बार दोहराया जाता है, और मौजूदा चीज़ को '+k(m[1])+' कहा जाता है।'},
+ function(m){return 'यह एक loop है। कोष्ठक में तीन हिस्से होते हैं: कहाँ से शुरू करना है, कब तक चलते रहना है, और हर बार के बाद क्या बदलना है: '+k(m[1])+'।'},
+ function(m){return 'यह एक loop है। जब तक '+k(m[1])+' सही है, नीचे वाला block बार-बार चलता रहता है।'},
+ function(m){return 'नहीं तो, अगर '+k(m[2])+' सही है, तो इसकी जगह नीचे वाला block चलता है।'},
+ function(){return 'ऊपर की कोई भी शर्त सही नहीं थी, तो नीचे वाला block चलता है।'},
+ function(m){return 'यह एक फ़ैसला (decision) है। नीचे वाला block तभी चलता है जब '+k(m[1])+' सही हो।'},
+ function(){return 'नीचे वाला block चलाकर देखता है। अगर error आए, तो <code>catch</code> पर चला जाता है।'},
+ function(){return 'यह तभी चलता है जब <code>try</code> वाले हिस्से में कुछ गड़बड़ हुई हो।'},
+ function(m){return m[1]?'function को यहीं खत्म करता है और '+k(m[1])+' को बुलाने वाले को वापस दे देता है।':'function को यहीं खत्म करता है।'},
+ function(m){return 'दूसरी जगह से code लाता है: '+k(m[1].replace(/;$/,''))+'।'},
+ function(m){return k(m[1])+' को console में दिखाता है।'},
+ function(m){return k(m[2])+' नाम का '+(m[1]==='const'?'constant':'variable')+' बनाता है और उसमें '+k(m[3])+' रखता है'+valHi(m[3])+'।'},
+ function(m){return k(m[1])+' को '+k(m[2]+' '+m[3])+' से उसी जगह अपडेट करता है।'},
+ function(m){return k(m[2])+' को '+k(m[1])+' में रखता है'+valHi(m[2])+'।'},
+ function(){return 'ऊपर खुले हुए block या group को बंद करता है।'}
+];
+function note(line,L,hi){
+  var t=line.trim(),R=L==='py'?PY:JS,H=L==='py'?PYH:JSH;
+  for(var i=0;i<R.length;i++){var m=t.match(R[i][0]);if(m)return hi?H[i](m,t):R[i][1](m,t)}
+  return hi?'यह चलता है: '+k(t)+'।':'Runs '+k(t)+'.';
 }
 function selfCalls(c){
   var ls=c.split('\n');
@@ -205,18 +253,20 @@ function selfCalls(c){
   }
   return false;
 }
-function summary(c,L){
+function summary(c,L,hi){
   var n=c.split('\n').filter(function(x){return x.trim()}).length;
   var fn=(c.match(/^\s*(def |(async\s+)?function[\s(]|class )|=>/gm)||[]).length;
   var lp=(c.match(/^\s*(\}\s*)?(for|while)\b/gm)||[]).length;
   var cd=(c.match(/^\s*(\}\s*)?(if|elif|else if)\b/gm)||[]).length;
-  var rec=selfCalls(c);
-  var chips=[];
+  var rec=selfCalls(c),chips=[],lg=L==='py'?'Python':'JavaScript';
   if(fn)chips.push('functions');if(lp)chips.push('loops');if(cd)chips.push('conditions');
   if(/\{\}|dict\(|new Map|\{\s*["'\w]+\s*:/.test(c))chips.push('lookup table');
   if(/(=|\bin|\breturn|\()\s*\[/.test(c)||/list\(/.test(c))chips.push('lists');
   if(rec)chips.push('recursion');
-  return {text:'Big picture: '+n+' lines of '+(L==='py'?'Python':'JavaScript')+'. It has '+fn+' function'+(fn===1?'':'s')+', '+lp+' loop'+(lp===1?'':'s')+' and '+cd+' decision'+(cd===1?'':'s')+'. Read it top to bottom, and remember that every indented or bracketed block belongs to the line just above it.'+(rec?' The function calls itself, which is called recursion.':''),chips:chips};
+  var text=hi
+    ?'मुख्य बात: '+n+' लाइनों का '+lg+' code। इसमें '+fn+' function, '+lp+' loop और '+cd+' फ़ैसले (if/else) हैं। इसे ऊपर से नीचे पढ़ें, और याद रखें कि हर अंदर खिसकी हुई या कोष्ठक वाली लाइन अपने ऊपर वाली लाइन का ही हिस्सा है।'+(rec?' यह function खुद को ही बुलाता है, इसे recursion कहते हैं।':'')
+    :'Big picture: '+n+' lines of '+lg+'. It has '+fn+' function'+(fn===1?'':'s')+', '+lp+' loop'+(lp===1?'':'s')+' and '+cd+' decision'+(cd===1?'':'s')+'. Read it top to bottom, and remember that every indented or bracketed block belongs to the line just above it.'+(rec?' The function calls itself, which is called recursion.':'');
+  return {text:text,chips:chips};
 }
 function speakText(t,lang){
   t=t.replace(/\s+/g,' ');
@@ -237,17 +287,17 @@ function speakText(t,lang){
     stopSpeech();var c=code.value;out.innerHTML='';
     if(!c.trim()){out.innerHTML='<p class="say">Paste some code first, then press Explain it.</p>';return}
     var hi=$('lang').value==='hi',isSample=norm(c)===norm(SAMPLE),L=lang(c),lines=c.split('\n').filter(function(x){return x.trim()});
-    outLang=isSample&&hi?'hi':'en';
+    outLang=hi?'hi':'en';
     var intro=document.createElement('p');intro.className='say';
-    intro.textContent=isSample&&hi?INTRO_HI:isSample?'Let us read this one together. It finds two numbers that add up to a target, and it does it in a single pass.':'Let us walk through it line by line.';
+    intro.textContent=isSample&&hi?INTRO_HI:isSample?'Let us read this one together. It finds two numbers that add up to a target, and it does it in a single pass.':hi?'चलिए इसे एक-एक लाइन करके समझते हैं।':'Let us walk through it line by line.';
     out.appendChild(intro);
     lines.forEach(function(ln,i){
       var d=document.createElement('div');d.className='rw';d.style.animationDelay=(.25+i*.22)+'s';
       var pre=document.createElement('pre');pre.textContent=ln.replace(/\t/g,'    ');
-      var nt=document.createElement('div');nt.innerHTML=isSample?(hi?SAMPLE_NOTES_HI[i]:SAMPLE_NOTES[i]):note(ln,L);
+      var nt=document.createElement('div');nt.innerHTML=isSample?(hi?SAMPLE_NOTES_HI[i]:SAMPLE_NOTES[i]):note(ln,L,hi);
       d.appendChild(pre);d.appendChild(nt);out.appendChild(d);
     });
-    var s=summary(c,L),t=(.25+lines.length*.22)+'s';
+    var s=summary(c,L,hi),t=(.25+lines.length*.22)+'s';
     var big=document.createElement('p');big.className='say rw';big.style.animationDelay=t;
     big.textContent=isSample&&hi?BIG_HI:isSample?'Big picture: the dictionary lets us remember the past, so one loop is enough. Checking every pair would need two loops and be much slower.':s.text;
     out.appendChild(big);
@@ -255,7 +305,7 @@ function speakText(t,lang){
     (isSample?['functions','loops','conditions','lookup table']:s.chips).forEach(function(x){var e=document.createElement('span');e.className='chip';e.textContent=x;ch.appendChild(e)});
     if(ch.children.length)out.appendChild(ch);
     if(!isSample){var n=document.createElement('p');n.className='note rw';n.style.animationDelay=t;
-      n.textContent=failed?'The AI explainer did not work ('+(typeof failed==='string'?failed:'unknown reason')+'), so this is the basic offline explanation'+(hi?' in English. Hindi needs the AI explainer':'')+'.':'This free explainer recognises common Python and JavaScript patterns. Unusual code gets a simple "runs this" note.';out.appendChild(n)}
+      n.textContent=hi?(failed?'AI समझाने वाला अभी काम नहीं कर पाया ('+(typeof failed==='string'?failed:'अज्ञात कारण')+'), इसलिए यह सरल ऑफ़लाइन व्याख्या है।':'यह मुफ़्त व्याख्या Python और JavaScript के आम पैटर्न पहचानती है। अनोखे code के लिए बस एक सरल नोट मिलता है।'):(failed?'The AI explainer did not work ('+(typeof failed==='string'?failed:'unknown reason')+'), so this is the basic offline explanation.':'This free explainer recognises common Python and JavaScript patterns. Unusual code gets a simple "runs this" note.');out.appendChild(n)}
   }
   /* narration: free browser text-to-speech, starts only when the user clicks Listen */
   var synth=window.speechSynthesis,speaking=false,voice=null,voiceHi=null,seq=0,lb=$('listen');
@@ -310,16 +360,25 @@ function speakText(t,lang){
     tail(outLang==='hi'?'यह एक AI मॉडल ने समझाया है, इसलिए ज़रूरी बातें दोबारा जाँच लें।':'Explained by an AI model, so double-check anything important.','note rw');
   }
   function ask(){
-    var c=code.value,q=$('q').value.trim(),lg=$('lang').value;
+    var c=code.value,q=$('q').value.trim(),lg=$('lang').value,lv=$('lvl').value;
     if(!c.trim()||(norm(c)===norm(SAMPLE)&&!q)){explain();return}
-    stopSpeech();out.innerHTML='<p class="say">Sensei is thinking...</p>';$('go').disabled=true;
-    var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},30000);
-    fetch('/api/explain',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,
-      body:JSON.stringify({code:c,level:$('lvl').value,lang:lg,question:q})})
-      .then(function(r){return r.json().catch(function(){return {error:'the /api/explain function was not found (HTTP '+r.status+')'}}).then(function(j){if(!r.ok)throw new Error(j.error||'failed (HTTP '+r.status+')');return j})})
-      .then(function(j){outLang=lg;renderAI(j)})
-      .catch(function(err){explain(String((err&&err.message)||'unknown error').slice(0,220))})
-      .then(function(){clearTimeout(to);$('go').disabled=false});
+    stopSpeech();$('go').disabled=true;
+    function think(msg){out.innerHTML='';var p=document.createElement('p');p.className='say';p.textContent=msg;out.appendChild(p)}
+    function attempt(n){
+      think(n===1?(lg==='hi'?'Sensei सोच रहे हैं...':'Sensei is thinking...')
+        :(lg==='hi'?'Google अभी व्यस्त है, फिर कोशिश कर रहे हैं ('+n+'/3)...':'Google is busy, trying again ('+n+' of 3)...'));
+      var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},30000);
+      fetch('/api/explain',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,
+        body:JSON.stringify({code:c,level:lv,lang:lg,question:q})})
+        .then(function(r){return r.json().catch(function(){return {error:'the /api/explain function was not found (HTTP '+r.status+')'}}).then(function(j){if(!r.ok)throw new Error(j.error||'failed (HTTP '+r.status+')');return j})})
+        .then(function(j){clearTimeout(to);outLang=lg;renderAI(j);$('go').disabled=false})
+        .catch(function(err){
+          clearTimeout(to);var m=String((err&&err.message)||'unknown error');
+          if(/busy|high demand|503|429/i.test(m)&&n<3){setTimeout(function(){attempt(n+1)},4000);return}
+          explain(m.slice(0,220));$('go').disabled=false;
+        });
+    }
+    attempt(1);
   }
   $('go').onclick=ask;
   $('lang').onchange=function(){if(norm(code.value)===norm(SAMPLE))explain()};
