@@ -159,12 +159,16 @@ pre{margin-top:12px;background:#0c0d0f;color:#e6e8eb;padding:14px;overflow-x:aut
        hb:['Nudge','Approach','Steps'],hl:['Nudge','Approach','Steps'],sol:'Show solution',hHints:"Sensei's hints",hSub:'Stuck? Ask for help one step at a time.',
        listen:'Listen',stop:'Stop',solT:'Solution',ask:'Want it explained? Paste it into <a href="practice.html">Ask Sensei</a>.',
        pass:function(n){return 'All '+n+' tests passed. Sensei bows.'},part:function(p,n){return p+' of '+n+' tests passed. Try again.'},
-       to:'Timed out after 3 seconds. Check for an infinite loop.',exp:'expected',got:'got'},
+       to:'Timed out after 3 seconds. Check for an infinite loop.',exp:'expected',got:'got',
+       py:'This looks like Python, but the Training Room runs JavaScript only for now. To understand your own code, paste it into <a href="practice.html">Ask Sensei</a>.',
+       imp:'import does not work here. Write your solution without import.'},
    hi:{sub:'हल लिखिए। Sensei सिर्फ़ hints देता है, जवाब नहीं।',home:'← होम',prob:'समस्याएँ',yc:'आपका code (JavaScript)',run:'टेस्ट चलाएँ',reset:'कोड रीसेट करें',
        hb:['इशारा','तरीका','चरण'],hl:['इशारा','तरीका','चरण'],sol:'हल दिखाएँ',hHints:'Sensei के hints',hSub:'अटक गए? एक-एक कदम करके मदद माँगिए।',
        listen:'सुनें',stop:'रुकें',solT:'हल',ask:'इसे समझना है? इसे <a href="practice.html">Ask Sensei</a> में paste कीजिए।',
        pass:function(n){return 'सभी '+n+' टेस्ट पास हुए। शाबाश!'},part:function(p,n){return n+' में से '+p+' टेस्ट पास हुए। फिर कोशिश कीजिए।'},
-       to:'3 सेकंड बाद रुक गया। देखिए कहीं अनंत loop तो नहीं।',exp:'उम्मीद',got:'मिला'}
+       to:'3 सेकंड बाद रुक गया। देखिए कहीं अनंत loop तो नहीं।',exp:'उम्मीद',got:'मिला',
+       py:'यह Python code लगता है, लेकिन Training Room अभी सिर्फ़ JavaScript चलाता है। अपना code समझने के लिए इसे <a href="practice.html">Ask Sensei</a> में paste कीजिए।',
+       imp:'यहाँ import नहीं चलता। अपना हल बिना import के लिखिए।'}
   };
   var $=function(i){return document.getElementById(i)};
   var cur=0,shown=0,solShown=false,store={solved:{}},code=$('code');
@@ -211,9 +215,12 @@ pre{margin-top:12px;background:#0c0d0f;color:#e6e8eb;padding:14px;overflow-x:aut
     "d.tests.forEach(function(t){var r,err=null,ok=false;try{r=f.apply(null,JSON.parse(JSON.stringify(t[0])));"+
     "if(d.sort&&Array.isArray(r))r=r.slice().sort(function(a,b){return a-b});ok=JSON.stringify(r)===JSON.stringify(t[1])}catch(x){err=String(x)}"+
     "out.push({r:r===undefined?'undefined':r,ok:ok,err:err})})}catch(x){out=[{fatal:String(x)}]}postMessage(out)}";
+  function looksPython(c){return /^\s*(def\s+\w+\s*\(.*\)\s*:|elif\s|from\s+\w+\s+import\s|import\s+\w+\s*$|print\()/m.test(c)}
   $('run').onclick=function(){
     var p=P[cur],btn=$('run'),res=$('res'),u=UI[L()],id=cur;
-    btn.disabled=true;res.innerHTML='';
+    res.innerHTML='';
+    if(looksPython(code.value)){var m=document.createElement('div');m.className='t bad';m.innerHTML=u.py;res.appendChild(m);return}
+    btn.disabled=true;
     var url=URL.createObjectURL(new Blob([W],{type:'text/javascript'})),worker=new Worker(url),finished=false;
     var timer=setTimeout(function(){worker.terminate();done([{fatal:u.to}])},3000);
     worker.onmessage=function(e){clearTimeout(timer);worker.terminate();done(e.data)};
@@ -223,7 +230,7 @@ pre{margin-top:12px;background:#0c0d0f;color:#e6e8eb;padding:14px;overflow-x:aut
       if(finished)return;finished=true;
       try{URL.revokeObjectURL(url)}catch(x){}
       btn.disabled=false;
-      if(out[0]&&out[0].fatal){var f=document.createElement('div');f.className='t bad';f.textContent=out[0].fatal;res.appendChild(f);return}
+      if(out[0]&&out[0].fatal){var f=document.createElement('div');f.className='t bad';f.textContent=/import statement/i.test(out[0].fatal)?u.imp:out[0].fatal;res.appendChild(f);return}
       var pass=0;
       out.forEach(function(o,i){
         var t=document.createElement('div'),inp=p.T[i][0].map(function(a){return JSON.stringify(a)}).join(', ');
