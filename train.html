@@ -89,6 +89,7 @@ pre{margin-top:12px;background:#0c0d0f;color:#e6e8eb;padding:14px;overflow-x:aut
     </section>
     <section class="p">
       <label for="code" class="lvl" id="yc"></label>
+      <p class="note" id="askNote"></p>
       <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
       <div class="row"><button class="btn" id="run"></button><button class="btn" id="reset"></button></div>
       <div id="res" aria-live="polite"></div>
@@ -161,14 +162,18 @@ pre{margin-top:12px;background:#0c0d0f;color:#e6e8eb;padding:14px;overflow-x:aut
        pass:function(n){return 'All '+n+' tests passed. Sensei bows.'},part:function(p,n){return p+' of '+n+' tests passed. Try again.'},
        to:'Timed out after 3 seconds. Check for an infinite loop.',exp:'expected',got:'got',
        py:'This looks like Python, but the Training Room runs JavaScript only for now. To understand your own code, paste it into <a href="practice.html">Ask Sensei</a>.',
-       imp:'import does not work here. Write your solution without import.'},
+       imp:'import does not work here. Write your solution without import.',
+       askNote:'Have your own code you want explained? Open <a href="practice.html">Ask Sensei</a>.',
+       nofn:function(f){return 'Your code needs a function named '+f+', because this problem checks that function. To understand your own code instead, paste it into <a href="practice.html">Ask Sensei</a>.'}},
    hi:{sub:'हल लिखिए। Sensei सिर्फ़ hints देता है, जवाब नहीं।',home:'← होम',prob:'समस्याएँ',yc:'आपका code (JavaScript)',run:'टेस्ट चलाएँ',reset:'कोड रीसेट करें',
        hb:['इशारा','तरीका','चरण'],hl:['इशारा','तरीका','चरण'],sol:'हल दिखाएँ',hHints:'Sensei के hints',hSub:'अटक गए? एक-एक कदम करके मदद माँगिए।',
        listen:'सुनें',stop:'रुकें',solT:'हल',ask:'इसे समझना है? इसे <a href="practice.html">Ask Sensei</a> में paste कीजिए।',
        pass:function(n){return 'सभी '+n+' टेस्ट पास हुए। शाबाश!'},part:function(p,n){return n+' में से '+p+' टेस्ट पास हुए। फिर कोशिश कीजिए।'},
        to:'3 सेकंड बाद रुक गया। देखिए कहीं अनंत loop तो नहीं।',exp:'उम्मीद',got:'मिला',
        py:'यह Python code लगता है, लेकिन Training Room अभी सिर्फ़ JavaScript चलाता है। अपना code समझने के लिए इसे <a href="practice.html">Ask Sensei</a> में paste कीजिए।',
-       imp:'यहाँ import नहीं चलता। अपना हल बिना import के लिखिए।'}
+       imp:'यहाँ import नहीं चलता। अपना हल बिना import के लिखिए।',
+       askNote:'अपना code समझना है? <a href="practice.html">Ask Sensei</a> खोलिए।',
+       nofn:function(f){return 'आपके code में '+f+' नाम का function होना चाहिए, क्योंकि यह समस्या उसी function को जाँचती है। अपना code समझना है तो उसे <a href="practice.html">Ask Sensei</a> में paste कीजिए।'}}
   };
   var $=function(i){return document.getElementById(i)};
   var cur=0,shown=0,solShown=false,store={solved:{}},code=$('code');
@@ -180,7 +185,7 @@ pre{margin-top:12px;background:#0c0d0f;color:#e6e8eb;padding:14px;overflow-x:aut
   function render(){
     var l=L(),u=UI[l],p=P[cur];
     document.documentElement.lang=l;
-    $('sub').textContent=u.sub;$('home').textContent=u.home;$('hProb').textContent=u.prob;$('yc').textContent=u.yc;
+    $('sub').textContent=u.sub;$('home').textContent=u.home;$('hProb').textContent=u.prob;$('yc').textContent=u.yc;$('askNote').innerHTML=u.askNote;
     $('run').textContent=u.run;$('reset').textContent=u.reset;$('hHints').textContent=u.hHints;$('hSub').textContent=u.hSub;
     $('b0').textContent=u.hb[0];$('b1').textContent=u.hb[1];$('b2').textContent=u.hb[2];$('bs').textContent=u.sol;
     $('listen').textContent=speaking?u.stop:u.listen;
@@ -230,7 +235,11 @@ pre{margin-top:12px;background:#0c0d0f;color:#e6e8eb;padding:14px;overflow-x:aut
       if(finished)return;finished=true;
       try{URL.revokeObjectURL(url)}catch(x){}
       btn.disabled=false;
-      if(out[0]&&out[0].fatal){var f=document.createElement('div');f.className='t bad';f.textContent=/import statement/i.test(out[0].fatal)?u.imp:out[0].fatal;res.appendChild(f);return}
+      if(out[0]&&out[0].fatal){var f=document.createElement('div');f.className='t bad';var fm=String(out[0].fatal);
+        if(/import statement/i.test(fm))f.textContent=u.imp;
+        else if(fm.indexOf('ReferenceError: '+p.fn+' is not defined')!==-1||fm.indexOf('Function '+p.fn+' not found')!==-1)f.innerHTML=u.nofn(p.fn);
+        else f.textContent=fm;
+        res.appendChild(f);return}
       var pass=0;
       out.forEach(function(o,i){
         var t=document.createElement('div'),inp=p.T[i][0].map(function(a){return JSON.stringify(a)}).join(', ');
