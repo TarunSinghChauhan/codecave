@@ -90,12 +90,14 @@ code{background:rgba(0,0,0,.14);padding:0 5px;font-family:var(--mono);font-size:
   <div class="main">
     <section class="p">
       <h2>Paste your code here</h2>
-      <div class="lvl">The box below starts with a sample. Click it and paste over the sample, or press "Paste my code".</div>
+      <div class="lvl">The box below starts with a sample. Click it and paste over the sample, or press "Paste my code". Tip: Ctrl+Enter explains.</div>
       <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Code to explain" placeholder="Paste your Python or JavaScript here"></textarea>
       <div class="opts"><label>Explain it like I am <select id="lvl"><option value="beginner">a complete beginner</option><option value="some">someone who knows the basics</option></select></label>
         <label>Language <select id="lang"><option value="en">English</option><option value="hi">हिन्दी</option></select></label>
         <input id="q" type="text" maxlength="200" placeholder="Anything confusing? Ask Sensei here (optional)" aria-label="Your question about the code"></div>
       <div class="row"><button class="btn" id="paste">Paste my code</button><button class="btn" id="go">Explain it</button><button class="btn" id="sample">Load sample</button><button class="btn" id="clear">Clear</button></div>
+      <p class="note" id="clipnote"></p>
+      <p class="note">Please do not paste passwords, API keys or private data. Your code is sent to an AI service (Google, and possibly a backup AI) to be explained, and free AI plans may use it to improve their products.</p>
     </section>
     <section class="p" aria-live="polite">
       <h2>Sensei</h2>
@@ -406,23 +408,47 @@ function speakText(t,lang){
     if(j.outro)tail(String(j.outro),'say rw');
     tail(outLang==='hi'?'यह एक AI मॉडल ने समझाया है, इसलिए ज़रूरी बातें दोबारा जाँच लें।':'Explained by an AI model, so double-check anything important.','note rw');
   }
+  var runId=0,activeCtl=null;
+  function cacheKey(c,lv,lg,q){var h=5381,t=lg+'|'+lv+'|'+q+'|'+c;for(var i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return 'cc:'+h+':'+t.length}
+  function cacheGet(k){try{var v=localStorage.getItem(k);return v?JSON.parse(v):null}catch(e){return null}}
+  function cacheSet(k,j){
+    try{
+      localStorage.setItem(k,JSON.stringify(j));
+      var idx=JSON.parse(localStorage.getItem('cc:index')||'[]').filter(function(x){return x!==k});
+      idx.push(k);while(idx.length>20)localStorage.removeItem(idx.shift());
+      localStorage.setItem('cc:index',JSON.stringify(idx));
+    }catch(e){}
+  }
   function ask(){
     var c=code.value,q=$('q').value.trim(),lg=$('lang').value,lv=$('lvl').value;
     if(!c.trim()||(norm(c)===norm(SAMPLE)&&!q)){explain();return}
-    stopSpeech();$('go').disabled=true;
-    function think(msg){out.innerHTML='';var p=document.createElement('p');p.className='say';p.textContent=msg;out.appendChild(p)}
+    stopSpeech();
+    var id=++runId,key=cacheKey(c,lv,lg,q),hit=cacheGet(key);
+    if(hit){try{outLang=lg;renderAI(hit);$('go').disabled=false;return}catch(e){}}   // same code, level, language and question: instant, no AI call
+    $('go').disabled=true;
+    function finish(){$('go').disabled=false}
+    function think(msg){
+      out.innerHTML='';
+      var p=document.createElement('p');p.className='say';p.textContent=msg;out.appendChild(p);
+      var b=document.createElement('button');b.className='btn';b.style.marginTop='10px';
+      b.textContent=lg==='hi'?'अभी सरल व्याख्या दिखाएँ':'Show quick explanation now';
+      b.onclick=function(){runId++;if(activeCtl)activeCtl.abort();finish();explain()};
+      out.appendChild(b);
+    }
     function attempt(n){
-      think(n===1?(lg==='hi'?'Sensei सोच रहे हैं...':'Sensei is thinking...')
-        :(lg==='hi'?'Google अभी व्यस्त है, फिर कोशिश कर रहे हैं ('+n+'/3)...':'Google is busy, trying again ('+n+' of 3)...'));
-      var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},30000);
+      if(id!==runId)return;
+      think(n===1?(lg==='hi'?'Sensei सोच रहे हैं (लगभग 10 सेकंड)...':'Sensei is thinking (about 10 seconds)...')
+        :(lg==='hi'?'Google अभी व्यस्त है, फिर कोशिश कर रहे हैं ('+n+'/2)...':'Google is busy, trying again ('+n+' of 2)...'));
+      var ctl=new AbortController();activeCtl=ctl;var to=setTimeout(function(){ctl.abort()},30000);
       fetch('/api/explain',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,
         body:JSON.stringify({code:c,level:lv,lang:lg,question:q})})
         .then(function(r){return r.json().catch(function(){return {error:'the /api/explain function was not found (HTTP '+r.status+')'}}).then(function(j){if(!r.ok)throw new Error(j.error||'failed (HTTP '+r.status+')');return j})})
-        .then(function(j){clearTimeout(to);outLang=lg;renderAI(j);$('go').disabled=false})
+        .then(function(j){clearTimeout(to);if(id!==runId)return;outLang=lg;renderAI(j);cacheSet(key,j);finish()})
         .catch(function(err){
-          clearTimeout(to);var m=String((err&&err.message)||'unknown error');
-          if(/busy|high demand|503|429/i.test(m)&&n<3){setTimeout(function(){attempt(n+1)},4000);return}
-          explain(m.slice(0,220));$('go').disabled=false;
+          clearTimeout(to);if(id!==runId)return;
+          var m=String((err&&err.message)||'unknown error');
+          if(/busy|high demand|503|429/i.test(m)&&n<2){setTimeout(function(){attempt(n+1)},3000);return}
+          finish();explain(m.slice(0,220));
         });
     }
     attempt(1);
@@ -430,10 +456,13 @@ function speakText(t,lang){
   $('go').onclick=ask;
   $('lang').onchange=function(){if(norm(code.value)===norm(SAMPLE))explain()};
   $('paste').onclick=function(){
-    var fallback=function(){code.focus();code.select()};
-    if(!navigator.clipboard||!navigator.clipboard.readText)return fallback();
-    navigator.clipboard.readText().then(function(t){if(t.trim()){code.value=t;ask()}else fallback()},fallback);
+    var note=$('clipnote');note.textContent='';
+    var fallback=function(msg){note.textContent=msg;code.focus();code.select()};
+    var blocked='Your browser blocked clipboard access. Click the box and press Ctrl+V (Cmd+V on a Mac).';
+    if(!navigator.clipboard||!navigator.clipboard.readText)return fallback(blocked);
+    navigator.clipboard.readText().then(function(t){if(t.trim()){code.value=t;ask()}else fallback('Your clipboard is empty. Copy some code first.')},function(){fallback(blocked)});
   };
+  code.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();ask()}});
   code.addEventListener('focus',function(){if(norm(code.value)===norm(SAMPLE))code.select()});
   $('sample').onclick=function(){code.value=SAMPLE;explain()};
   $('clear').onclick=function(){stopSpeech();code.value='';out.innerHTML='';code.focus()};
