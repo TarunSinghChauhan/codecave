@@ -73,6 +73,27 @@ code{background:rgba(0,0,0,.14);padding:0 5px;font-family:var(--mono);font-size:
 .opts select,.opts input{font:inherit;color:var(--text);background:rgba(255,255,255,.2);border:1px solid #07080a;padding:9px 10px}
 .opts input{flex:1;min-width:220px}
 .opts select:focus-visible,.opts input:focus-visible{outline:2px solid #000;outline-offset:2px}
+[hidden]{display:none!important}
+.vwrap{margin-top:12px}
+.vstage{position:relative;border:1px solid rgba(0,0,0,.45);background:rgba(255,255,255,.1);overflow:hidden;min-height:120px}
+.vstage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.ve{fill:none;stroke:#07080a;stroke-width:1.5;opacity:0;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .9s ease,opacity .4s}
+.ve.on{opacity:.75;stroke-dashoffset:0}
+.ve.back{stroke-dasharray:5 4;stroke-dashoffset:0}
+.vn{position:absolute;opacity:0;transform:scale(.85);transition:transform .8s cubic-bezier(.2,.8,.2,1),opacity .5s}
+.vn.show{opacity:1;transform:none}
+.vn>div{min-height:46px;display:flex;align-items:center;justify-content:center;padding:6px 10px;font-size:.78rem;line-height:1.3;text-align:center;overflow-wrap:anywhere;
+  border:1px solid #07080a;border-radius:10px;background:rgba(255,255,255,.4);color:#07080a;transition:background .3s,box-shadow .3s;animation:vdrift var(--t) ease-in-out var(--dl) infinite}
+.vn.input>div{background:rgba(255,255,255,.65)}
+.vn.memory>div{background:#14161a;color:#e9eaec}
+.vn.result>div{border-width:2px;font-weight:500}
+.vn.decision>div{border-style:dashed}
+.vn.hot>div{box-shadow:0 0 0 3px rgba(0,0,0,.4),0 8px 20px rgba(0,0,0,.28);font-weight:500}
+@keyframes vdrift{0%,100%{transform:translate(0,0)}50%{transform:translate(var(--dx),var(--dy))}}
+.vbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.vbar .btn{padding:8px 16px}
+.vbar span{font-size:.82rem;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){.vn,.ve{transition:none}.vn>div{animation:none}}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .chip{border:1px solid #07080a;padding:2px 10px;font-size:.82rem}
 .note{margin-top:14px;font-size:.8rem;color:var(--muted)}
@@ -101,7 +122,8 @@ code{background:rgba(0,0,0,.14);padding:0 5px;font-family:var(--mono);font-size:
     </section>
     <section class="p" aria-live="polite">
       <h2>Sensei</h2>
-      <div class="row" style="margin:6px 0 4px"><button class="btn" id="listen">Listen</button></div>
+      <div class="row" style="margin:6px 0 4px"><button class="btn" id="listen">Listen</button><button class="btn" id="vizbtn" disabled>Show visual</button></div>
+      <div class="vwrap" id="viz" hidden><div class="vstage" id="vstage"></div><div class="vbar"><button class="btn" id="vprev">Back</button><button class="btn" id="vplay">Play</button><button class="btn" id="vnext">Next</button><span id="vcap"></span></div></div>
       <div class="note" id="vnote"></div>
       <div id="out"></div>
     </section>
@@ -131,6 +153,13 @@ var SAMPLE_NOTES_HI=[
 ];
 var INTRO_HI='चलिए इस code को साथ में पढ़ते हैं। यह दो ऐसी संख्याएँ ढूँढता है जिनका जोड़ target के बराबर हो, और यह काम सिर्फ़ एक बार list पर चलकर कर लेता है।';
 var BIG_HI='मुख्य बात: dictionary हमें पिछली बातें याद रखने देती है, इसलिए एक ही loop काफ़ी है। हर जोड़ी को जाँचने में दो loop लगते और वह बहुत धीमा होता।';
+var SAMPLE_GRAPH={
+ nodes:[{id:'nums',label:'nums',kind:'input'},{id:'target',label:'target',kind:'input'},{id:'seen',label:'seen = {}',kind:'memory'},
+  {id:'loop',label:'for i, n in nums',kind:'action'},{id:'need',label:'need = target - n',kind:'action'},{id:'check',label:'need in seen ?',kind:'decision'},
+  {id:'ret',label:'return the pair',kind:'result'},{id:'store',label:'seen[n] = i',kind:'memory'}],
+ edges:[{from:'nums',to:'loop'},{from:'loop',to:'need'},{from:'target',to:'need'},{from:'need',to:'check'},{from:'seen',to:'check'},
+  {from:'check',to:'ret'},{from:'check',to:'store'},{from:'store',to:'loop'}],
+ focus:[['nums','target'],['seen'],['loop','nums'],['need','loop','target'],['check','need','seen'],['ret','check'],['store','check','seen']]};
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function k(s){return '<code>'+esc(String(s).trim())+'</code>'}
 function lang(c){
@@ -320,7 +349,7 @@ function speakText(t,lang){
   var $=function(i){return document.getElementById(i)},code=$('code'),out=$('out'),outLang='en';
   var norm=function(s){return s.replace(/\s+$/gm,'').trim()};
   function explain(failed){
-    stopSpeech();var c=code.value;out.innerHTML='';
+    stopSpeech();setGraph(null);var c=code.value;out.innerHTML='';
     if(!c.trim()){out.innerHTML='<p class="say">Paste some code first, then press Explain it.</p>';return}
     var hi=$('lang').value==='hi',isSample=norm(c)===norm(SAMPLE),L=lang(c);
     /* quick view: skip comments and lone closing brackets, so only lines that do something are explained */
@@ -334,11 +363,12 @@ function speakText(t,lang){
     intro.textContent=isSample&&hi?INTRO_HI:isSample?'Let us read this one together. It finds two numbers that add up to a target, and it does it in a single pass.':hi?'चलिए इसे एक-एक लाइन करके समझते हैं।':'Let us walk through it line by line.';
     out.appendChild(intro);
     shown.forEach(function(ln,i){
-      var d=document.createElement('div');d.className='rw';d.style.animationDelay=(.25+i*step)+'s';
+      var d=document.createElement('div');d.className='rw';d.style.animationDelay=(.25+i*step)+'s';d.setAttribute('data-step',i);d.onclick=function(){if(V.open)vizGo(i)};
       var pre=document.createElement('pre');pre.textContent=ln.replace(/\t/g,'    ');
       var nt=document.createElement('div');nt.innerHTML=isSample?(hi?SAMPLE_NOTES_HI[i]:SAMPLE_NOTES[i]):note(ln,L,hi);
       d.appendChild(pre);d.appendChild(nt);out.appendChild(d);
     });
+    setGraph(isSample?SAMPLE_GRAPH:vizFromLines(shown));
     var s=summary(c,L,hi),t=(.25+shown.length*step)+'s';
     var big=document.createElement('p');big.className='say rw';big.style.animationDelay=t;
     big.textContent=isSample&&hi?BIG_HI:isSample?'Big picture: the dictionary lets us remember the past, so one loop is enough. Checking every pair would need two loops and be much slower.':s.text;
@@ -356,6 +386,169 @@ function speakText(t,lang){
       if(failed){var rb=document.createElement('button');rb.className='btn';rb.style.marginTop='10px';rb.textContent=hi?'AI से फिर कोशिश करें':'Try the AI again';rb.onclick=ask;out.appendChild(rb)}
     }
   }
+  /* ---------- visual mode: the code as floating bubbles joined by lines ---------- */
+  var V={open:false,g:null,step:-1,el:{},pos:{},first:{},edges:[],timer:null};
+  var VT={en:{show:'Show visual',hide:'Hide visual',prev:'Back',next:'Next',play:'Play',pause:'Pause',step:'Step',none:'The visual is for shorter code (up to about 14 bubbles).'},
+          hi:{show:'विज़ुअल दिखाएँ',hide:'विज़ुअल छिपाएँ',prev:'पीछे',next:'आगे',play:'चलाएँ',pause:'रोकें',step:'चरण',none:'विज़ुअल छोटे code के लिए है (लगभग 14 bubbles तक)।'}};
+  function vl(){return VT[$('lang').value==='hi'?'hi':'en']}
+  function vizCaption(){$('vcap').textContent=V.g?vl().step+' '+(V.step+1)+'/'+V.g.focus.length:''}
+  function vizLabels(){var t=vl();$('vizbtn').textContent=V.open?t.hide:t.show;$('vizbtn').title=V.g||!out.children.length?'':t.none;
+    $('vprev').textContent=t.prev;$('vnext').textContent=t.next;$('vplay').textContent=V.timer?t.pause:t.play;vizCaption()}
+  function vizStop(){if(V.timer){clearInterval(V.timer);V.timer=null}}
+  function setGraph(g){
+    vizStop();V.g=g;V.step=-1;$('vizbtn').disabled=!g;
+    $('viz').hidden=!(V.open&&g);                       // V.open is the user's choice; it survives re-renders (language change, retry)
+    if(g&&V.open){vizBuild();vizGo(0)}
+    vizLabels();
+  }
+  function vizBuild(){
+    var st=$('vstage'),g=V.g;st.innerHTML='';V.el={};V.pos={};V.first={};V.edges=[];
+    var W=st.clientWidth||640,PADL=36,AW=W-PADL-8,last=g.focus.length-1;
+    g.nodes.forEach(function(n){V.first[n.id]=last});
+    g.focus.forEach(function(f,i){f.forEach(function(id){if(V.first[id]>i)V.first[id]=i})});
+    var adj={},state={},back={},layer={};
+    g.nodes.forEach(function(n){adj[n.id]=[];layer[n.id]=0});
+    g.edges.forEach(function(e){adj[e.from].push(e.to)});
+    function dfs(u){state[u]=1;adj[u].forEach(function(v){if(state[v]===1)back[u+'>'+v]=1;else if(!state[v])dfs(v)});state[u]=2}
+    g.nodes.forEach(function(n){if(!state[n.id])dfs(n.id)});
+    for(var k=0;k<g.nodes.length;k++)g.edges.forEach(function(e){if(!back[e.from+'>'+e.to]&&layer[e.to]<layer[e.from]+1)layer[e.to]=layer[e.from]+1});
+    var rows=[],maxc=1;
+    g.nodes.forEach(function(n){var l=layer[n.id];(rows[l]=rows[l]||[]).push(n)});
+    rows.forEach(function(r){if(r&&r.length>maxc)maxc=r.length});
+    var nw=Math.max(96,Math.min(180,Math.floor(AW/maxc)-16)),GAP=98;
+    st.insertAdjacentHTML('beforeend','<svg aria-hidden="true"><defs><marker id="va" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1L9 5L1 9" fill="none" stroke="#07080a" stroke-width="1.6"/></marker></defs></svg>');
+    var svg=st.querySelector('svg');
+    rows.forEach(function(r,l){
+      if(!r)return;var seg=AW/r.length;
+      r.forEach(function(n,i){
+        var el=document.createElement('div'),inner=document.createElement('div');
+        el.className='vn '+n.kind;el.style.width=nw+'px';inner.textContent=n.label;
+        inner.style.setProperty('--dx',(Math.random()*8-4).toFixed(1)+'px');inner.style.setProperty('--dy',(Math.random()*10-5).toFixed(1)+'px');
+        inner.style.setProperty('--t',(5+Math.random()*4).toFixed(1)+'s');inner.style.setProperty('--dl',(-Math.random()*6).toFixed(1)+'s');
+        el.appendChild(inner);
+        var x=PADL+seg*i+seg/2-nw/2,y=12+l*GAP;el.style.left=x.toFixed(0)+'px';el.style.top=y+'px';
+        st.appendChild(el);V.el[n.id]=el;
+        var h=el.offsetHeight||46;V.pos[n.id]={x:x,y:y,w:nw,h:h,cx:x+nw/2,cy:y+h/2};
+      });
+    });
+    st.style.height=(rows.length*GAP+20)+'px';
+    g.edges.forEach(function(e){
+      var a=V.pos[e.from],b=V.pos[e.to],isBack=!!back[e.from+'>'+e.to],d;
+      if(isBack)d='M'+a.x+' '+a.cy+' C'+(a.x-52)+' '+a.cy+' '+(b.x-52)+' '+b.cy+' '+(b.x-2)+' '+b.cy;
+      else{var y1=a.y+a.h,y2=b.y,dy=Math.max(24,(y2-y1)/2);d='M'+a.cx+' '+y1+' C'+a.cx+' '+(y1+dy)+' '+b.cx+' '+(y2-dy)+' '+b.cx+' '+(y2-2)}
+      var p=document.createElementNS('http://www.w3.org/2000/svg','path');
+      p.setAttribute('d',d);p.setAttribute('class','ve'+(isBack?' back':''));p.setAttribute('marker-end','url(#va)');
+      if(!isBack)p.setAttribute('pathLength','1');
+      svg.appendChild(p);V.edges.push({el:p,first:Math.max(V.first[e.from],V.first[e.to])});
+    });
+  }
+  function vizGo(i){
+    var g=V.g;if(!g||!V.open)return;
+    i=Math.max(0,Math.min(g.focus.length-1,i));V.step=i;
+    g.nodes.forEach(function(n){
+      var el=V.el[n.id],show=V.first[n.id]<=i,hot=g.focus[i].indexOf(n.id)!==-1;
+      if(show&&!el._on){                                   // a new bubble: it grows out of the bubbles that feed it, so they merge into it
+        var src=g.edges.filter(function(e){return e.to===n.id&&e.from!==n.id&&V.first[e.from]<=i}).map(function(e){return V.pos[e.from]});
+        if(src.length){
+          var cx=0,cy=0;src.forEach(function(p){cx+=p.cx;cy+=p.cy});cx/=src.length;cy/=src.length;
+          el.style.transition='none';
+          el.style.transform='translate('+(cx-V.pos[n.id].cx).toFixed(0)+'px,'+(cy-V.pos[n.id].cy).toFixed(0)+'px) scale(.45)';
+          void el.offsetWidth;el.style.transition='';el.style.transform='';
+        }
+      }
+      el._on=show;el.classList.toggle('show',show);el.classList.toggle('hot',show&&hot);
+    });
+    V.edges.forEach(function(e){e.el.classList.toggle('on',e.first<=i)});
+    [].forEach.call(out.querySelectorAll('.on'),function(x){x.classList.remove('on')});
+    var row=out.querySelector('.rw[data-step="'+i+'"]');if(row)row.classList.add('on');
+    vizCaption();
+  }
+  $('vizbtn').onclick=function(){
+    if(!V.g)return;V.open=!V.open;$('viz').hidden=!V.open;
+    if(V.open){vizBuild();vizGo(0)}else vizStop();
+    vizLabels();
+  };
+  $('vnext').onclick=function(){vizStop();vizGo(V.step+1);vizLabels()};
+  $('vprev').onclick=function(){vizStop();vizGo(V.step-1);vizLabels()};
+  $('vplay').onclick=function(){
+    if(!V.g)return;if(V.timer){vizStop();vizLabels();return}
+    if(V.step>=V.g.focus.length-1)vizGo(0);
+    V.timer=setInterval(function(){if(V.step>=V.g.focus.length-1){vizStop();vizLabels();return}vizGo(V.step+1)},2400);vizLabels();
+  };
+  addEventListener('resize',function(){if(V.open&&V.g){vizBuild();vizGo(V.step)}});
+
+  /* picture from the AI (with a fallback built from the code itself) */
+  function vizFromAI(j){
+    var g=j.graph;
+    if(g&&Array.isArray(g.nodes)&&g.nodes.length>=2&&g.nodes.length<=14&&Array.isArray(g.edges)){
+      var ids={};g.nodes.forEach(function(n){ids[n.id]=1});
+      var focus=j.steps.slice(0,40).map(function(s){return (s.focus||[]).filter(function(id){return ids[id]})});
+      if(focus.some(function(f){return f.length}))
+        return {nodes:g.nodes,edges:g.edges.filter(function(e){return ids[e.from]&&ids[e.to]&&e.from!==e.to}),focus:focus};
+    }
+    var lines=[],map=[];
+    j.steps.slice(0,40).forEach(function(st,si){String(st.code||'').split('\n').forEach(function(l){if(l.trim()){lines.push(l);map.push(si)}})});
+    var b=vizFromLines(lines);if(!b)return null;
+    var fc=j.steps.slice(0,40).map(function(){return []});
+    b.focus.forEach(function(f,li){f.forEach(function(id){var a=fc[map[li]];if(a.indexOf(id)===-1)a.push(id)})});
+    return {nodes:b.nodes,edges:b.edges,focus:fc};
+  }
+  /* picture built from the code lines (works offline, for Python and JavaScript) */
+  function vizFromLines(lines){
+    var KW={};('def class for while if elif else try except finally with return import from in not and or is None True False print range len const let var function new of await async console log null true false undefined this lambda pass break continue raise throw switch case default typeof as').split(' ').forEach(function(w){KW[w]=1});
+    var nodes=[],edges=[],byId={},bind={},stack=[],focus=[];
+    function idents(t){return (String(t).replace(/(["'`])(?:\\.|(?!\1).)*\1/g,' ').match(/[A-Za-z_]\w*/g)||[]).filter(function(w){return !KW[w]})}
+    function cut(t){t=String(t).replace(/\s+/g,' ').trim();return t.length>34?t.slice(0,33)+'…':t}
+    function node(id,label,kind){if(!byId[id]){byId[id]=1;nodes.push({id:id,label:cut(label),kind:kind})}}
+    function link(a,b){if(a&&b&&a!==b&&!edges.some(function(e){return e.from===a&&e.to===b}))edges.push({from:a,to:b})}
+    function srcs(expr,self){var o=[];idents(expr).forEach(function(w){var id=bind[w];if(id&&id!==self&&o.indexOf(id)===-1)o.push(id)});return o.slice(0,3)}
+    lines.forEach(function(line,i){
+      var t=line.trim(),ind=line.match(/^\s*/)[0].length,f=[],m;
+      while(stack.length&&stack[stack.length-1].ind>=ind){var q=stack.pop();if(q.loop&&q.last)link(q.last,q.id)}
+      var par=stack.length?stack[stack.length-1].id:null;
+      function mk(id,label,kind,src,push){
+        node(id,label,kind);src.forEach(function(x){link(x,id)});
+        if(par&&(!src.length||kind==='result'))link(par,id);
+        f=[id].concat(src);stack.forEach(function(x){if(x.loop)x.last=id});
+        if(push)stack.push({ind:ind,id:id,loop:push==='loop'});
+      }
+      if(m=t.match(/^(?:async\s+)?(?:def|function)\s*\w*\s*\(([^)]*)\)/)){
+        m[1].split(',').forEach(function(p){var n=p.replace(/=.*$/,'').replace(/:.*$/,'').replace(/[*\s]/g,'');
+          if(/^[A-Za-z_]\w*$/.test(n)){bind[n]=n;node(n,n,'input');f.push(n)}});
+      }else if(m=t.match(/^for\s*\(\s*(?:const|let|var)\s+(.+?)\s+(?:of|in)\s+(.+?)\)\s*\{?$/)||t.match(/^for\s+(.+?)\s+in\s+(.+?):$/)){
+        var id='loop'+i;mk(id,'for '+m[1].trim()+' in '+m[2].trim(),'action',srcs(m[2]),'loop');idents(m[1]).forEach(function(v){bind[v]=id});
+      }else if(m=t.match(/^for\s*\((.*)\)\s*\{?$/)){
+        var id2='loop'+i;mk(id2,'for ('+m[1].trim()+')','action',srcs(m[1]),'loop');idents(m[1].split(';')[0]).forEach(function(v){bind[v]=id2});
+      }else if(m=t.match(/^while\b\s*(.+?)\s*[:{]?$/)){
+        var c1=m[1].replace(/^\((.*)\)$/,'$1');mk('loop'+i,'while '+c1,'action',srcs(c1),'loop');
+      }else if(m=t.match(/^(?:\}\s*)?(?:elif|else\s+if|if)\b\s*(.+?)\s*[:{]?$/)){
+        var c2=m[1].replace(/^\((.*)\)$/,'$1');mk('if'+i,c2+' ?','decision',srcs(c2),'if');
+      }else if(/^(?:\}\s*)?else\s*[:{]?$/.test(t)||/^(?:try|finally|pass|break|continue|import|from|class)\b/.test(t)||/^(?:\}\s*)?(?:except|catch)\b/.test(t)){
+        f=[];
+      }else if(m=t.match(/^return\b\s*(.*?);?$/)){
+        mk('ret'+i,m[1]?'return '+m[1]:'return','result',srcs(m[1]));
+      }else if(m=t.match(/^(?:print|console\.log)\s*\((.*)\)\s*;?$/)){
+        mk('out'+i,'show '+m[1],'result',srcs(m[1]));
+      }else if((m=t.match(/^(?:(?:const|let|var)\s+)?([A-Za-z_][\w.\[\]]*(?:\s*,\s*[A-Za-z_]\w*)*)\s*(\+=|-=|\*=|\/=|=)\s*([^=].*?);?$/))&&!/^(?:def|class|if|elif|for|while|return)\b/.test(t)){
+        var lhs=m[1],rhs=m[3],base=lhs.match(/[A-Za-z_]\w*/)[0];
+        var kind=/^(\{|\[|dict\(|list\(|set\(|new Map|new Set)/.test(rhs.trim())?'memory':'action';
+        if(/[\[.]/.test(lhs)){
+          var s1=srcs(rhs+' '+lhs.replace(/^[A-Za-z_]\w*/,''));if(bind[base]&&s1.indexOf(bind[base])===-1)s1.push(bind[base]);
+          mk('upd'+i,t,'memory',s1.slice(0,3));
+        }else{
+          var s2=srcs(rhs,base);
+          if(byId[base]){s2.forEach(function(x){link(x,base)});f=[base].concat(s2);stack.forEach(function(x){if(x.loop)x.last=base})}
+          else{mk(base,t,kind,s2);bind[base]=base}
+        }
+      }else{
+        var s3=srcs(t);if(s3.length)mk('act'+i,t,'action',s3);
+      }
+      focus.push(f);
+    });
+    while(stack.length){var q2=stack.pop();if(q2.loop&&q2.last)link(q2.last,q2.id)}
+    return nodes.length>=2&&nodes.length<=14?{nodes:nodes,edges:edges,focus:focus}:null;
+  }
+
   /* narration: free browser text-to-speech, starts only when the user clicks Listen */
   var synth=window.speechSynthesis,speaking=false,voice=null,voiceHi=null,seq=0,lb=$('listen');
   function pickVoice(){
@@ -366,7 +559,7 @@ function speakText(t,lang){
   if(synth){pickVoice();if(synth.addEventListener)synth.addEventListener('voiceschanged',pickVoice)}else lb.style.display='none';
   function mark(el){
     [].forEach.call(out.querySelectorAll('.on'),function(x){x.classList.remove('on')});
-    if(el){el.classList.add('on');el.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}
+    if(el){el.classList.add('on');var stp=el.getAttribute&&el.getAttribute('data-step');if(V.open&&stp!==null)vizGo(+stp);el.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}
   }
   function stopSpeech(){seq++;speaking=false;if(synth)synth.cancel();lb.textContent='Listen';mark(null)}
   function listen(){
@@ -398,15 +591,17 @@ function speakText(t,lang){
     if(!j||!Array.isArray(j.steps)||!j.steps.length)throw new Error('bad reply');
     out.innerHTML='';var i=0;
     var a=document.createElement('p');a.className='say';a.textContent=String(j.intro||'Let us walk through it together.');out.appendChild(a);
-    j.steps.slice(0,40).forEach(function(st){
-      var d=document.createElement('div');d.className='rw';d.style.animationDelay=(.2+i++*.22)+'s';
+    j.steps.slice(0,40).forEach(function(st,si){
+      var d=document.createElement('div');d.className='rw';d.style.animationDelay=(.2+i++*.22)+'s';d.setAttribute('data-step',si);d.onclick=function(){if(V.open)vizGo(si)};
       var pre=document.createElement('pre');pre.textContent=String(st.code||'').replace(/\t/g,'    ');
       var nt=document.createElement('div');nt.textContent=String(st.say||'');
       d.appendChild(pre);d.appendChild(nt);out.appendChild(d);
     });
     function tail(txt,cls){var e=document.createElement('p');e.className=cls;e.textContent=txt;e.style.animationDelay=(.2+i++*.22)+'s';out.appendChild(e)}
+    setGraph(vizFromAI(j));
     if(j.outro)tail(String(j.outro),'say rw');
-    tail(outLang==='hi'?'यह एक AI मॉडल ने समझाया है, इसलिए ज़रूरी बातें दोबारा जाँच लें।':'Explained by an AI model, so double-check anything important.','note rw');
+    var who=j.provider==='groq'?(outLang==='hi'?' (बैकअप AI)':' (backup AI)'):j.provider==='gemini'?' (Gemini)':'';
+    tail(outLang==='hi'?'यह एक AI मॉडल ने समझाया है'+who+', इसलिए ज़रूरी बातें दोबारा जाँच लें।':'Explained by an AI model'+who+', so double-check anything important.','note rw');
   }
   var runId=0,activeCtl=null;
   function cacheKey(c,lv,lg,q){var h=5381,t=lg+'|'+lv+'|'+q+'|'+c;for(var i=0;i<t.length;i++)h=((h<<5)+h+t.charCodeAt(i))|0;return 'cc:'+h+':'+t.length}
@@ -428,7 +623,7 @@ function speakText(t,lang){
     $('go').disabled=true;
     function finish(){$('go').disabled=false}
     function think(msg){
-      out.innerHTML='';
+      setGraph(null);out.innerHTML='';
       var p=document.createElement('p');p.className='say';p.textContent=msg;out.appendChild(p);
       var b=document.createElement('button');b.className='btn';b.style.marginTop='10px';
       b.textContent=lg==='hi'?'अभी सरल व्याख्या दिखाएँ':'Show quick explanation now';
@@ -438,7 +633,7 @@ function speakText(t,lang){
     function attempt(n){
       if(id!==runId)return;
       think(n===1?(lg==='hi'?'Sensei सोच रहे हैं (लगभग 10 सेकंड)...':'Sensei is thinking (about 10 seconds)...')
-        :(lg==='hi'?'Google अभी व्यस्त है, फिर कोशिश कर रहे हैं ('+n+'/2)...':'Google is busy, trying again ('+n+' of 2)...'));
+        :(lg==='hi'?'AI अभी व्यस्त है, फिर कोशिश कर रहे हैं ('+n+'/2)...':'The AI is busy, trying again ('+n+' of 2)...'));
       var ctl=new AbortController();activeCtl=ctl;var to=setTimeout(function(){ctl.abort()},30000);
       fetch('/api/explain',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,
         body:JSON.stringify({code:c,level:lv,lang:lg,question:q})})
@@ -454,7 +649,7 @@ function speakText(t,lang){
     attempt(1);
   }
   $('go').onclick=ask;
-  $('lang').onchange=function(){if(norm(code.value)===norm(SAMPLE))explain()};
+  $('lang').onchange=function(){vizLabels();if(norm(code.value)===norm(SAMPLE))explain()};
   $('paste').onclick=function(){
     var note=$('clipnote');note.textContent='';
     var fallback=function(msg){note.textContent=msg;code.focus();code.select()};
@@ -489,7 +684,7 @@ function speakText(t,lang){
   }
   var tm;addEventListener('resize',function(){clearTimeout(tm);tm=setTimeout(build,200)});
   build();
-  code.value=SAMPLE;setTimeout(explain,1400);
+  code.value=SAMPLE;vizLabels();setTimeout(explain,1400);
 
   if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   var cc=['{','}','<','>','/',';','0','1','()','=>','[]','#','$','&&','::','fn','if'],lx=-999,ly=-999,live=0;
