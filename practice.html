@@ -125,6 +125,7 @@ code{background:rgba(0,0,0,.14);padding:0 5px;font-family:var(--mono);font-size:
       <div class="row" style="margin:6px 0 4px"><button class="btn" id="listen">Listen</button><button class="btn" id="vizbtn" disabled>Show visual</button></div>
       <div class="vwrap" id="viz" hidden><div class="vstage" id="vstage"></div><div class="vbar"><button class="btn" id="vprev">Back</button><button class="btn" id="vplay">Play</button><button class="btn" id="vnext">Next</button><span id="vcap"></span></div></div>
       <div class="note" id="vnote"></div>
+      <p class="say" id="stale" hidden></p>
       <div id="out"></div>
     </section>
   </div>
@@ -368,7 +369,7 @@ function speakText(t,lang){
       var nt=document.createElement('div');nt.innerHTML=isSample?(hi?SAMPLE_NOTES_HI[i]:SAMPLE_NOTES[i]):note(ln,L,hi);
       d.appendChild(pre);d.appendChild(nt);out.appendChild(d);
     });
-    setGraph(isSample?SAMPLE_GRAPH:vizFromLines(shown));
+    setGraph(isSample?SAMPLE_GRAPH:vizFromLines(shown));stamp(c);
     var s=summary(c,L,hi),t=(.25+shown.length*step)+'s';
     var big=document.createElement('p');big.className='say rw';big.style.animationDelay=t;
     big.textContent=isSample&&hi?BIG_HI:isSample?'Big picture: the dictionary lets us remember the past, so one loop is enough. Checking every pair would need two loops and be much slower.':s.text;
@@ -388,19 +389,29 @@ function speakText(t,lang){
   }
   /* ---------- visual mode: the code as floating bubbles joined by lines ---------- */
   var V={open:false,g:null,step:-1,el:{},pos:{},first:{},edges:[],timer:null};
-  var VT={en:{show:'Show visual',hide:'Hide visual',prev:'Back',next:'Next',play:'Play',pause:'Pause',step:'Step',none:'The visual is for shorter code (up to about 14 bubbles).'},
-          hi:{show:'विज़ुअल दिखाएँ',hide:'विज़ुअल छिपाएँ',prev:'पीछे',next:'आगे',play:'चलाएँ',pause:'रोकें',step:'चरण',none:'विज़ुअल छोटे code के लिए है (लगभग 14 bubbles तक)।'}};
+  var VT={en:{show:'Show visual',hide:'Hide visual',prev:'Back',next:'Next',play:'Play',pause:'Pause',step:'Step',none:'The visual is for shorter code (up to about 14 bubbles).',refresh:'Press "Explain it" first to update the picture.',stale:'You changed the code. Press "Explain it" to update this explanation and the picture.'},
+          hi:{show:'विज़ुअल दिखाएँ',hide:'विज़ुअल छिपाएँ',prev:'पीछे',next:'आगे',play:'चलाएँ',pause:'रोकें',step:'चरण',none:'विज़ुअल छोटे code के लिए है (लगभग 14 bubbles तक)।',refresh:'पहले "Explain it" दबाइए, फिर picture अपडेट होगी।',stale:'आपने code बदल दिया है। इस व्याख्या और picture को अपडेट करने के लिए "Explain it" दबाइए।'}};
   function vl(){return VT[$('lang').value==='hi'?'hi':'en']}
   function vizCaption(){$('vcap').textContent=V.g?vl().step+' '+(V.step+1)+'/'+V.g.focus.length:''}
-  function vizLabels(){var t=vl();$('vizbtn').textContent=V.open?t.hide:t.show;$('vizbtn').title=V.g||!out.children.length?'':t.none;
+  function vizLabels(){var t=vl();$('vizbtn').textContent=V.open?t.hide:t.show;$('vizbtn').title=stale?t.refresh:(V.g||!out.children.length?'':t.none);
     $('vprev').textContent=t.prev;$('vnext').textContent=t.next;$('vplay').textContent=V.timer?t.pause:t.play;vizCaption()}
   function vizStop(){if(V.timer){clearInterval(V.timer);V.timer=null}}
+  var lastShown='',stale=false,explainedCode='';
+  function applyViz(){$('vizbtn').disabled=!V.g||stale;$('viz').hidden=!(V.open&&V.g&&!stale)}
   function setGraph(g){
-    vizStop();V.g=g;V.step=-1;$('vizbtn').disabled=!g;
-    $('viz').hidden=!(V.open&&g);                       // V.open is the user's choice; it survives re-renders (language change, retry)
+    vizStop();V.g=g;V.step=-1;stale=false;applyViz();   // V.open is the user's choice; it survives re-renders
     if(g&&V.open){vizBuild();vizGo(0)}
     vizLabels();
   }
+  /* the picture and the explanation belong to the code that was explained; warn when the box has changed since */
+  function checkStale(){
+    stale=lastShown!==''&&norm(code.value)!==lastShown;
+    $('stale').hidden=!stale;$('stale').textContent=vl().stale;
+    if(stale)vizStop();
+    applyViz();vizLabels();
+  }
+  function stamp(c){lastShown=norm(c);checkStale()}
+  code.addEventListener('input',checkStale);
   function vizBuild(){
     var st=$('vstage'),g=V.g;st.innerHTML='';V.el={};V.pos={};V.first={};V.edges=[];
     var W=st.clientWidth||640,PADL=36,AW=W-PADL-8,last=g.focus.length-1;
@@ -475,7 +486,7 @@ function speakText(t,lang){
     if(V.step>=V.g.focus.length-1)vizGo(0);
     V.timer=setInterval(function(){if(V.step>=V.g.focus.length-1){vizStop();vizLabels();return}vizGo(V.step+1)},2400);vizLabels();
   };
-  addEventListener('resize',function(){if(V.open&&V.g){vizBuild();vizGo(V.step)}});
+  addEventListener('resize',function(){if(V.open&&V.g&&!stale){vizBuild();vizGo(V.step)}});
 
   /* picture from the AI (with a fallback built from the code itself) */
   function vizFromAI(j){
@@ -598,7 +609,7 @@ function speakText(t,lang){
       d.appendChild(pre);d.appendChild(nt);out.appendChild(d);
     });
     function tail(txt,cls){var e=document.createElement('p');e.className=cls;e.textContent=txt;e.style.animationDelay=(.2+i++*.22)+'s';out.appendChild(e)}
-    setGraph(vizFromAI(j));
+    setGraph(vizFromAI(j));stamp(explainedCode);
     if(j.outro)tail(String(j.outro),'say rw');
     var who=j.provider==='groq'?(outLang==='hi'?' (बैकअप AI)':' (backup AI)'):j.provider==='gemini'?' (Gemini)':'';
     tail(outLang==='hi'?'यह एक AI मॉडल ने समझाया है'+who+', इसलिए ज़रूरी बातें दोबारा जाँच लें।':'Explained by an AI model'+who+', so double-check anything important.','note rw');
@@ -619,11 +630,11 @@ function speakText(t,lang){
     if(!c.trim()||(norm(c)===norm(SAMPLE)&&!q)){explain();return}
     stopSpeech();
     var id=++runId,key=cacheKey(c,lv,lg,q),hit=cacheGet(key);
-    if(hit){try{outLang=lg;renderAI(hit);$('go').disabled=false;return}catch(e){}}   // same code, level, language and question: instant, no AI call
+    if(hit){try{explainedCode=c;outLang=lg;renderAI(hit);$('go').disabled=false;return}catch(e){}}   // same code, level, language and question: instant, no AI call
     $('go').disabled=true;
     function finish(){$('go').disabled=false}
     function think(msg){
-      setGraph(null);out.innerHTML='';
+      setGraph(null);lastShown='';checkStale();out.innerHTML='';
       var p=document.createElement('p');p.className='say';p.textContent=msg;out.appendChild(p);
       var b=document.createElement('button');b.className='btn';b.style.marginTop='10px';
       b.textContent=lg==='hi'?'अभी सरल व्याख्या दिखाएँ':'Show quick explanation now';
@@ -638,7 +649,7 @@ function speakText(t,lang){
       fetch('/api/explain',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,
         body:JSON.stringify({code:c,level:lv,lang:lg,question:q})})
         .then(function(r){return r.json().catch(function(){return {error:'the /api/explain function was not found (HTTP '+r.status+')'}}).then(function(j){if(!r.ok)throw new Error(j.error||'failed (HTTP '+r.status+')');return j})})
-        .then(function(j){clearTimeout(to);if(id!==runId)return;outLang=lg;renderAI(j);cacheSet(key,j);finish()})
+        .then(function(j){clearTimeout(to);if(id!==runId)return;explainedCode=c;outLang=lg;renderAI(j);cacheSet(key,j);finish()})
         .catch(function(err){
           clearTimeout(to);if(id!==runId)return;
           var m=String((err&&err.message)||'unknown error');
@@ -649,7 +660,7 @@ function speakText(t,lang){
     attempt(1);
   }
   $('go').onclick=ask;
-  $('lang').onchange=function(){vizLabels();if(norm(code.value)===norm(SAMPLE))explain()};
+  $('lang').onchange=function(){checkStale();if(norm(code.value)===norm(SAMPLE))explain()};
   $('paste').onclick=function(){
     var note=$('clipnote');note.textContent='';
     var fallback=function(msg){note.textContent=msg;code.focus();code.select()};
@@ -660,7 +671,7 @@ function speakText(t,lang){
   code.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();ask()}});
   code.addEventListener('focus',function(){if(norm(code.value)===norm(SAMPLE))code.select()});
   $('sample').onclick=function(){code.value=SAMPLE;explain()};
-  $('clear').onclick=function(){stopSpeech();code.value='';out.innerHTML='';code.focus()};
+  $('clear').onclick=function(){stopSpeech();setGraph(null);lastShown='';checkStale();code.value='';out.innerHTML='';code.focus()};
 
   /* same floating code and cursor trail as the home page */
   var sn=['const','function()','async/await','{ }','< />','=>','01','git commit','npm run dev','API','LLM','Python','FastAPI','Redis','GitHub','def solve():','import','return','await','git push','for i in range(n)','!=','&&','SELECT *'];
